@@ -284,7 +284,7 @@ if (!FONTS[store.get('font')] || store.get('fontDefault')!=='10'){ store.set('fo
   const v = store.get(id); if (v!==null) $(id).value = v;
   $(id).addEventListener('input',()=>{ store.set(id,$(id).value); draw(); });
 });
-$('owned').addEventListener('input',()=>{ $('count').value=''; draw(); }); // 所持数を変えたら「所持数−1」に戻す
+$('owned').addEventListener('input',()=>{ $('count').value=''; draw(); }); // 所持数を変えたら「所持数そのまま」に戻す
 $('minus').onclick=()=>{ $('count').value=Math.max(0,(countValue()??1)-1); draw(); };
 $('plus').onclick=()=>{ $('count').value=(countValue()??0)+1; draw(); };
 const JFONTS=[["Mochiy Pop One", "400"], ["M PLUS Rounded 1c", "900"], ["Zen Maru Gothic", "900"], ["Kiwi Maru", "500"], ["Hachi Maru Pop", "400"], ["Dela Gothic One", "400"], ["Potta One", "400"], ["Rampart One", "400"], ["Yusei Magic", "400"], ["Kosugi Maru", "400"], ["Cherry Bomb One", "400"], ["Mochiy Pop P One", "400"], ["RocknRoll One", "400"], ["Reggae One", "400"], ["Stick", "400"], ["DotGothic16", "400"]];
@@ -447,7 +447,7 @@ async function readOwned(img){
 
 // ---- 複数アイテム（2〜12個）：選んだ順に並べる ----
 let items=[];
-const itemCount=it=>it.count!=null ? it.count : Math.max(0,(it.owned||1)-1);
+const itemCount=it=>it.count!=null ? it.count : (it.owned||0);
 async function setItems(files){
   const seq=++ocrSeq; shotImg=null;
   // 読み込み中にまた選び直されたら、古いほうは途中でやめる（混ざらないように自分用の入れ物に入れる）
@@ -628,7 +628,7 @@ function rr(x,y,w,h,r){ ctx.beginPath(); ctx.roundRect(x,y,w,h,r); }
 function countValue(){
   // 所持数も×数も未入力なら、×数字は出さない
   if ($('owned').value==='' && $('count').value===''){ $('countView').textContent='−'; return null; }
-  const auto=Math.max(0,($('owned').value|0)-1);
+  const auto=Math.max(0,$('owned').value|0);
   const v=$('count').value!=='' ? Math.max(0,$('count').value|0) : auto;
   $('countView').textContent=v; return v;
 }
