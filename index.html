@@ -155,10 +155,30 @@
   .chip img.snap{width:auto;height:20px;max-width:70px;object-fit:contain;border-radius:6px;background:#fff}
   .nosnap{font-size:10px;color:var(--sub);font-weight:800}
   .copy{flex:none;padding:12px 10px;font-size:14px;background:linear-gradient(180deg,#c3b0f0,var(--lav));box-shadow:0 4px 0 var(--lav2)}
+  /* 読み取った名前の一覧（辞書と一致＝緑、不一致＝赤） */
+  #names{width:100%;display:flex;flex-direction:column;gap:4px}
+  .nmRow{display:flex;align-items:center;gap:6px;background:#fff;border-radius:14px;padding:5px 8px;box-shadow:0 2px 0 #f6cfe2;font-size:13px;cursor:pointer;border:2px solid transparent}
+  .nmRow .no{flex:none;width:18px;height:18px;border-radius:50%;background:var(--pink);color:#fff;font-size:11px;font-weight:900;line-height:18px;text-align:center}
+  .nmRow{flex-wrap:wrap}
+  .nmRow .t{flex:1 1 55%;min-width:55%;overflow-wrap:anywhere;font-weight:800}
+  .nmRow .st{flex:none;font-size:11px;font-weight:900;border-radius:99px;padding:2px 8px;white-space:nowrap}
+  .nmRow .tx{white-space:nowrap}
+  .nmRow .cp{flex:none;border:0;border-radius:99px;padding:6px 10px;font:inherit;font-size:11px;font-weight:900;cursor:pointer;background:#efe9ff;color:#7f63c9;white-space:nowrap}
+  .nmRow.ok .st{background:#dff7e8;color:#1f9a57}.nmRow.ng{border-color:#ff8aa0;background:#fff4f6}.nmRow.ng .st{background:#ffd9e0;color:#d0304f}
+  .nmRow.wait .st{background:#f3eef5;color:var(--sub)}
+  .nmRow.iph{border-color:#ffd66b;background:#fffbea}.nmRow.iph .st{background:#fff0b8;color:#a87400}
+  .nmRow .rm{flex:none;width:30px;height:30px;border-radius:50%;border:0;background:#f3eef5;color:#8a7a8e;font-size:16px;font-weight:900;cursor:pointer;line-height:30px;padding:0}
+  .nmRow .rm.sure{background:#ff5a6e;color:#fff;width:auto;padding:0 10px;font-size:12px}
+  .nmRow .tx{flex:none;border:0;border-radius:99px;padding:6px 8px;font:inherit;font-size:11px;font-weight:900;cursor:pointer;background:#e9f9ef;color:#1f9a57}
+  .nmRow .tx.off{background:#f3eef5;color:#9a8a9e;text-decoration:line-through}
+  .nmRow.skip .t{color:#b3a6b6;text-decoration:line-through}
+  .cand{display:flex;align-items:center;gap:8px;width:100%;border:2px solid #f6e4ee;border-radius:14px;background:#fff;padding:9px 12px;margin-top:6px;font:inherit;font-size:14px;font-weight:800;color:var(--ink);text-align:left;cursor:pointer}
+  .cand small{flex:none;color:var(--sub);font-weight:700}
+  .cand.best{border-color:var(--pink)}
 </style>
 </head>
 <body>
-<header>ピグパ画像加工アプリ
+<header>ピグパ画像加工アプリ<small id="verLabel" style="position:absolute;right:56px;bottom:2px;font-size:9px;opacity:.75;font-weight:700;text-shadow:none"></small>
   <a class="gear left" id="openRank" href="ranking.html" aria-label="売れ筋ランキング"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7.5 21H2V9h5.5v12zm7.25-18h-5.5v18h5.5V3zM22 11h-5.5v10H22V11z"/></svg></a>
   <button class="gear" id="openSet" type="button" aria-label="設定"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg></button></header>
 <main class="one">
@@ -175,7 +195,9 @@
     <input type="hidden" id="count">
   </div>
   <img id="ownSnap" alt="元画像の所持数" hidden>
+  <div id="pendNote" class="note" style="width:100%;text-align:center;font-weight:800;margin:0" hidden></div>
   <div id="multi"></div>
+  <div id="names"></div>
 </div>
 </main>
 
@@ -195,6 +217,13 @@
 <div class="row tcRow" id="totalColorRow"></div><label>自由に指定 <input type="color" id="totalColor" value="#f82da1"></label></div></div>
   </div></section>
 
+  <section class="card"><h2>ショートカット連携（iPhone）</h2><div class="in">
+    <div class="note">iPhoneの「ショートカット」にスクショの文字を読ませて、このアプリに渡せます。背面タップで起動すれば、スクショを撮って背面を3回たたくだけで名前と所持数が入ります。</div>
+    <a class="pill wide" href="shortcut.html" style="margin-top:8px;text-decoration:none;display:flex">📱 ショートカットの作り方</a>
+    <div class="note" id="recvLog" style="white-space:pre-line;margin-top:8px"></div>
+    <div class="note" id="appVer" style="text-align:right"></div>
+  </div></section>
+
   <section class="card"><h2>覚えた名前</h2><div class="in">
     <div class="note">文字起こしで直して「もう一度コピー」した名前です。同じ読み取りになったら右の名前に自動で直します（この端末だけ）。</div>
     <div id="learnedList"></div>
@@ -211,7 +240,10 @@
       <option value="plain">名前×2（記号なし）</option>
     </select></div>
     <div class="row"><label>題名の×1 <select id="titleOne"><option value="show">×1も付ける</option><option value="hide">×1は省く</option></select></label></div>
+    <div class="row"><label>題名の名前の区切り <select id="titleSep"><option value="nl">改行（1行に1つ）</option><option value="sp">空白（1行にまとめる）</option></select></label></div>
     <div class="row"><label><input type="checkbox" id="titleTotal" checked> 題名に「計○点」を付ける（2個以上のとき）</label></div>
+    <div class="row"><label><input type="checkbox" id="autoCopy" checked> 「題名」「文字」を押したらすぐコピーする</label></div>
+    <div class="note">オフにすると、押したときは文字を表示するだけで、確認してから「コピー」を押します。どちらでも、赤い名前（一覧にない名前）が残っている間はコピーできません。</div>
     <div class="row"><label style="width:100%">最初の行（空欄なら入れない）<input type="text" id="txtHead" placeholder="例：【即購入OK】" style="width:100%;border:2px solid #ffd0e6;border-radius:14px;padding:8px 10px;font-size:16px"></label></div>
     <div class="row"><label style="width:100%">合計の書き方<input type="text" id="txtTotal" value="計{n}点" style="width:100%;border:2px solid #ffd0e6;border-radius:14px;padding:8px 10px;font-size:16px"></label></div>
     <div class="row"><label style="width:100%">最後の行（空欄なら入れない）<textarea id="txtFoot" rows="3" placeholder="例：購入後にマイコードとお名前をお知らせください" style="width:100%;border:2px solid #ffd0e6;border-radius:14px;padding:8px 10px;font:inherit;font-size:16px"></textarea></label></div>
@@ -260,10 +292,20 @@
   <textarea id="txtBox" rows="10" style="width:100%;border:2px solid #ffd0e6;border-radius:14px;padding:10px;font:inherit;font-size:16px;background:#fff"></textarea>
   <button class="pill wide" id="txtCopy" type="button" style="margin-top:10px">もう一度コピー</button>
 </div></div>
+<div id="fixSheet" class="sheet" hidden><div class="sheetIn">
+  <div class="sheetHead">✏️ 名前を直す<button class="close" id="fixClose" type="button">✕</button></div>
+  <p class="note" id="fixMsg" style="font-weight:800;margin:12px 0 6px"></p>
+  <input type="text" id="fixInput" autocomplete="off" style="width:100%;border:2px solid #ffd0e6;border-radius:14px;padding:10px;font:inherit;font-size:16px;background:#fff">
+  <div id="fixCands"></div>
+  <div class="row" style="margin-top:10px"><button class="pill" id="fixUse" type="button" style="flex:1">この名前にする</button><button class="pill lav" id="fixAsIs" type="button" style="flex:1">一覧にないけどOK</button></div>
+  <div class="note">候補をタップすると、その名前に直して覚えます。一覧にない新しいアイテムは「一覧にないけどOK」で、そのまま使えるようになります。</div>
+</div></div>
 <div class="bar"><div class="inner"><button class="pill copy" id="copyTitle" type="button">🏷 題名</button><button class="pill copy" id="copyTxt" type="button">📋 文字</button><button class="pill save" id="dl">🎁 画像を保存</button></div></div>
 
 <script src="ocr/tesseract.min.js"></script>
 <script>
+const APP_VER='1'; // 変えたら上げる（古いページを読み直すための目印）
+document.getElementById('verLabel').textContent='v'+APP_VER;
 const S = 1254;
 // アイテム画像の位置・サイズは常に固定（正方形）
 const BOX = {x:127, y:128, size:1000};
@@ -301,7 +343,7 @@ function renderFonts(){ const g=$('fontGrid'); g.innerHTML='';
     b.innerHTML=`<span class="fn">${n}</span><span class="fs" style="font-family:'${f}',sans-serif;font-weight:${w}">×1 2 3 4 5 6 7 8 9 10</span>`;
     b.onclick=()=>{ $('font').value=n; store.set('font',n); renderFonts(); draw(); }; g.appendChild(b); }); }
 renderFonts();
-$('openSet').onclick=()=>{ $('settings').hidden=false; renderLearned(); document.querySelector('.fontOpt.on')?.scrollIntoView({block:'nearest'});  };
+$('openSet').onclick=()=>{ $('settings').hidden=false; renderLearned(); renderRecv(); $('appVer').textContent='アプリの版：'+APP_VER; document.querySelector('.fontOpt.on')?.scrollIntoView({block:'nearest'});  };
 const closeSet=()=>{ $('settings').hidden=true;  };
 $('closeSet').onclick=closeSet; $('settings').addEventListener('click',e=>{ if(e.target.id==='settings') closeSet(); });
 $('showCount').addEventListener('change',draw);
@@ -347,9 +389,12 @@ const timeLimit=(p,ms)=>Promise.race([p,new Promise((_,ng)=>setTimeout(()=>ng(ne
 // 読み間違えやすいカタカナの補正
 function fixKana(t){ return t.replace(/ン(?=[ャュョ])/g,'シ').replace(/ソ(?=[ャュョ])/g,'シ').replace(/ー{2,}/g,'ー'); }
 // アイテム名一覧（items.json）と、この端末で直した名前（学習）で、読み取った名前をいちばん近い名前に置き換える
-let itemNames=null;
-const loadItemNames=()=>itemNames ??= fetch('items.json',{cache:'no-cache'}).then(r=>{ if(!r.ok) throw 0; return r.json(); }).then(j=>j.names||[])
-  .catch(()=>{ itemNames=null; return []; }); // 読み込めなかったら次の読み取りでもう一度試す
+let itemNames=null, dictExact=new Set();
+// 辞書：items.json（公式一覧サイト）＋ data/gametrade-names.json（出品の題名で見かけた名前）
+const loadItemNames=()=>itemNames ??= Promise.all(['items.json','data/gametrade-names.json'].map(u=>fetch(u,{cache:'no-cache'}).then(r=>r.ok?r.json():{}).catch(()=>({}))))
+  .then(([a,b])=>{ const names=[...new Set([...(Array.isArray(a?.names)?a.names:[]),...(Array.isArray(b?.names)?b.names:[])])]; if(!names.length) itemNames=null; // 読み込めなかったら次の読み取りでもう一度試す
+    dictExact=new Set(names); return names; }).catch(()=>{ itemNames=null; return []; });
+loadItemNames();
 const normName=t=>t.normalize('NFKC').replace(/[\s・･「」『』【】（）()]/g,'').replace(/[ぁ-ゖ]/g,c=>String.fromCharCode(c.charCodeAt(0)+96));
 // 保存形式：{正規化した読み取り: {from:読み取った文字, to:直した名前}}
 const learned={ all(){ try{ return JSON.parse(localStorage.getItem('pigpa_learned')||'{}'); }catch(e){ return {}; } },
@@ -395,12 +440,12 @@ async function nearestItemName(name){
   return best && bd<=lim && second-bd>=.5 ? best : name;
 }
 // 切り抜いた部分を、濃い文字だけ残して拡大し、1行として読む
-async function readLine(img,x,y,w,h,psm='7'){
+async function readLine(img,x,y,w,h,psm='7',thr=150){
   const z=Math.max(1,96/h), nc=document.createElement('canvas'); nc.width=Math.round(w*z); nc.height=Math.round(h*z);
   const ng=nc.getContext('2d',{willReadFrequently:true}); ng.imageSmoothingQuality='high';
   ng.drawImage(img,x,y,w,h,0,0,nc.width,nc.height);
   const id=ng.getImageData(0,0,nc.width,nc.height), d=id.data;
-  for (let i=0;i<d.length;i+=4){ const L=.3*d[i]+.59*d[i+1]+.11*d[i+2], v=L<150?0:255; d[i]=d[i+1]=d[i+2]=v; }
+  for (let i=0;i<d.length;i+=4){ const L=.3*d[i]+.59*d[i+1]+.11*d[i+2], v=L<thr?0:255; d[i]=d[i+1]=d[i+2]=v; }
   ng.putImageData(id,0,0);
   await ocrWorker.setParameters({tessedit_pageseg_mode:psm, preserve_interword_spaces:'0'});
   const {data}=await timeLimit(ocrWorker.recognize(nc),20000); return data.text;
@@ -425,25 +470,244 @@ async function analyzeShot(img){
     if (m) r.owned=+m[1];
     const cc=document.createElement('canvas'); cc.width=bw; cc.height=bh; cc.getContext('2d').drawImage(img,bx,by,bw,bh,0,0,bw,bh); r.snap=cc.toDataURL(); // 確認用（完成画像には入れない）
   }catch(e){}
+  // 組にするための数字：リリース日（名前の下の薄い灰色の行）と「ほしい!」の数（水色の画像の右下）
+  let sigT='';
+  try{ sigT+=await readLine(img, W*.4, lay.top+W*.06, W*.59, W*.07, '7', 205); }catch(e){}
+  try{ sigT+='\n'+await readLine(img, W*.78, lay.blueBottom-W*.075, W*.21, W*.07, '7', 170); }catch(e){}
+  r.sig=numSig(sigT);
   try{ await ocrWorker.setParameters({tessedit_pageseg_mode:'3'}); }catch(e){}
   if (r.name){ r.raw=r.name; r.name=await nearestItemName(r.name); }
   return r;
 }
-let shotName='', shotRaw='';
-function setShot(i){ shotName=''; $('ownSnap').hidden=true; items=[]; renderItems(); shotImg=i; $('count').value=''; readOwned(i); }
+let picking=false, shotName='', shotRaw='', shotReading=false, shotIph=false, shotNoGift=false;
+function setShot(i){ shotName=''; shotRaw=''; shotIph=false; shotNoGift=false; $('ownSnap').hidden=true; items=[]; renderItems(); shotImg=i; $('count').value=''; shotReading=true; renderNames(); readOwned(i); }
 async function readOwned(img){
   const seq=++ocrSeq; $('ownState').textContent='読取中…';
+  const pinfo=pendingInfo(), pend=pinfo.list;
+  if (pend.length===1 && !pinfo.used){ // ショートカットから1枚分を受け取っている：先に名前と所持数を入れる
+    shotName=pend[0].name||''; shotRaw=''; shotIph=true; shotNoGift=!!pend[0].noGift; if (pend[0].owned){ $('owned').value=pend[0].owned; $('count').value=''; $('ownState').textContent='自動'; } shotReading=false; renderNames(); draw(); }
   try{
     const r=await analyzeShot(img); if (seq!==ocrSeq) return;
     if (!r) throw 0;
     // 見出しの下の線〜「入手可能です」の行までを正方形で切り抜く（縦のほうが長いので、左右に少し白い余白が付く）
     if (r.top!=null){ $('ct').value=+((r.top/img.width)*100).toFixed(1); $('cs').value=+(((r.squareBottom-r.top)/img.width)*100).toFixed(1); }
-    shotName=r.name||''; shotRaw=r.raw||''; $('ownSnap').src=r.snap||''; $('ownSnap').hidden=!r.snap;
-    if (r.owned){ $('owned').value=r.owned; $('count').value=''; $('ownState').textContent='自動'; }
-    else $('ownState').textContent='読取×';
-    draw();
-  }catch(e){ if(seq===ocrSeq) $('ownState').textContent='読取×'; }
+    $('ownSnap').src=r.snap||''; $('ownSnap').hidden=!r.snap;
+    const p=(pend.length ? ((pend.length===1 && !pinfo.used) ? pend[0] : nearestPending(r.raw||r.name||'',pend,r.sig,pinfo.used)) : null) || histMatch(r.raw||r.name||'',r.sig);
+    if (pend.length) markPendingUsed();
+    if (p){ // 受け取った名前のうち、画面の文字にいちばん近いものを使う
+      shotName=p.name||''; shotRaw=r.raw||''; shotIph=true; shotNoGift=!!(p.noGift||r.noGift); if (p.owned){ $('owned').value=p.owned; $('count').value=''; $('ownState').textContent='自動'; } else if (r.owned){ $('owned').value=r.owned; $('count').value=''; $('ownState').textContent='自動'; } else $('ownState').textContent='読取×';
+    } else {
+      shotName=r.name||''; shotRaw=r.raw||''; shotIph=false; shotNoGift=!!r.noGift;
+      if (r.owned){ $('owned').value=r.owned; $('count').value=''; $('ownState').textContent='自動'; }
+      else $('ownState').textContent='読取×';
+    }
+    shotReading=false; renderNames(); draw(); warnNoGift();
+  }catch(e){ if(seq===ocrSeq){ $('ownState').textContent='読取×'; shotReading=false; renderNames(); } }
 }
+// プレゼント禁止のアイテム（画面に「プレゼント禁止」「プレゼント不可」などの表示がある）
+// 画面の数字（「欲しい」の数・リリース日など）で、ショートカットの読み取りと選んだ画像を組にする
+// アプリ内の読み取りは文字が苦手でも数字はよく読めるので、名前より確実に合わせられる
+function numSig(text){ const t=(text||'').normalize('NFKC'), out=new Set();
+  for (const m of t.matchAll(/(\d{4})\s*[年/.\-]\s*(\d{1,2})\s*[月/.\-]\s*(\d{1,2})/g)) out.add(`d${+m[1]}-${+m[2]}-${+m[3]}`); // リリース日
+  for (const m of t.replace(/(\d),(\d{3})/g,'$1$2').matchAll(/\d{3,}/g)) if (!/^(19|20)\d\d$/.test(m[0])) out.add('n'+(+m[0])); // 3桁以上の数（年だけの数は除く）
+  return [...out]; }
+// 受け取った中で1枚にしか出てこない数字だけを手がかりにする（同じガチャのリリース日など、共通の数字では決めない）
+function uniqSigs(pend,imgs){ const cnt=new Map(), ci=new Map(); pend.forEach(p=>new Set(p.sig||[]).forEach(x=>cnt.set(x,(cnt.get(x)||0)+1)));
+  (imgs||[]).forEach(it=>new Set(it.sig||[]).forEach(x=>ci.set(x,(ci.get(x)||0)+1)));
+  // 受け取った中で1枚にしかなく、選んだ画像の中でも1枚にしかない数字だけ（同じガチャのリリース日のような共通の数字は使わない）
+  return s=>(s||[]).filter(x=>cnt.get(x)===1 && (!imgs || (ci.get(x)||0)<=1)); }
+const sigScore=(a,b)=>{ if(!a?.length||!b?.length) return 0; const B=new Set(b); return a.filter(x=>B.has(x)).length; };
+// ゲームの表示は「ギフト不可」（「ギフト出来ません」はマスターの段階で出るだけなので含めない）
+const NOGIFT=/ギフト\s*不可|プレゼント\s*(禁止|不可|できません|できない|NG)|贈(り物不可|与不可)|譲渡不可/;
+// ---- ショートカット（iPhoneの文字認識）から受け取った文字：URLの #t= に「=====」区切りで1枚ずつ入っている ----
+const PENDING_KEY='pigpa_pendingOcr';
+const JUNK=/リリース|ほしい|欲しい|所持数|持数|アイテム詳細|ダブり|希少|入手可能|こうかん|ガチャ|コーデ|復刻|^[\d:：個]+$/;
+// iPhoneの読み取りはほぼ正確なので、名前の行はそのまま使う（一覧と完全一致・覚えた名前があればそちら）
+// 一覧の名前を NFKC でそろえた形から元の表記を引く（全角の！などを含む名前も一致させる）
+let dictNormMap=null, dictNormSize=-1;
+const dictNorm=()=>{ if (dictNormSize!==dictExact.size){ dictNormMap=new Map(); for (const n of dictExact) dictNormMap.set(n.normalize('NFKC'),n); dictNormSize=dictExact.size; } return dictNormMap; };
+// このアプリ自身の画面のスクショ（所持数などの文字が写る）は、アイテムの画面として使わない
+const APP_SCREEN=/ピグパ画像加工アプリ|アイテム画像を選ぶ|画像を保存|ショートカットから\d*枚分/;
+// 名前の後ろに付いた記号だけを外す（ピグパの名前の横にはコピーのマークがないので、文字は外さない）
+function stripIcon(l){ let x=l.normalize('NFKC').replace(/[\s©®□■◻︎⧉📋]+$/u,'').trim();
+  return x; }
+// 辞書を待たずにすぐ読む（辞書がまだなら、iPhoneが読んだ行をそのまま使う）
+function parseBlock(t){
+  const lines=t.split(/\n/).map(l=>l.trim()).filter(Boolean), flat=t.replace(/\s/g,'');
+  // ピグパの「アイテム詳細」画面だけを使う（所持数・リリース日・ダブり数のどれかが写っている）
+  if (!/所持数|リリース日|ダブり数/.test(flat) || APP_SCREEN.test(flat)) return null;
+  const m=flat.match(/所持数[^0-9]*(\d+)/), owned=m?+m[1]:null;
+  const noGift=NOGIFT.test(flat), sig=numSig(t), DN=dictNorm();
+  const ex=lines.map(l=>DN.get(l.normalize('NFKC'))||DN.get(stripIcon(l))).find(Boolean); if (ex) return {name:ex, owned, iph:true, noGift, sig};
+  // 名前の行：「リリース日」の行のすぐ上。なければ「アイテム詳細」の見出しの下
+  const okLine=l=>!JUNK.test(l) && !NOGIFT.test(l.replace(/\s/g,'')) && [...l.replace(/\s/g,'')].length>=2 && /[\p{L}]/u.test(l) && !/^[\p{Nd}\s:：.,/年月日%個?？!！]+$/u.test(l) && !/[\p{Nd}]{3,}/u.test(l.replace(/\s/g,''));
+  const ri=lines.findIndex(l=>/リリース/.test(l)), hi=lines.findIndex(l=>/アイテム詳細/.test(l.replace(/\s/g,'')));
+  let hint=(ri>0 ? lines.slice(hi>=0&&hi<ri?hi+1:0,ri).reverse().find(okLine) : null)
+    || (hi>=0 ? lines.slice(hi+1).find(okLine) : null)
+    || lines.filter(okLine).sort((a,b)=>b.length-a.length)[0] || '';
+  hint=stripIcon(hint).replace(/^[\s・]+/,'').trim();
+  const M=learned.all(), k=normName(hint);
+  return {name:(M[k]?.to ?? M[k]) || hint, owned, iph:true, noGift, sig};
+}
+// 受け取った記録（設定の「ショートカット連携」に表示。うまくいかないときに画面で原因が分かるように）
+const RECV_KEY='pigpa_lastRecv';
+function saveRecv(o){ try{ localStorage.setItem(RECV_KEY,JSON.stringify({at:Date.now(),ver:APP_VER,...o})); }catch(e){} renderRecv(); }
+function renderRecv(){ const el=$('recvLog'); if(!el) return; let j=null; try{ j=JSON.parse(localStorage.getItem(RECV_KEY)||'null'); }catch(e){}
+  if(!j){ el.textContent='まだショートカットから受け取っていません'; return; }
+  const d=new Date(j.at); el.textContent=`最後に受け取った：${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}（版${j.ver}）\n`+
+    `スクショ${j.blocks??0}枚分・使った${j.kept??0}枚・文字数${j.len??0}`+(j.via?`（${j.via}）`:'')+(j.err?`\nエラー：${j.err}`:'')+(j.names?.length?`\n名前：${j.names.join(' / ')}`:'')+(j.dropped?.length?`\n使わなかった：${j.dropped.join(' / ')}`:'')+(lastErr()?`\n最近のエラー：${lastErr()}`:'')+`\n保存しているiPhoneの読み取り：${histAll().length}件`; }
+// 予期しないエラーを記録しておく（設定の記録に出す）
+const lastErr=()=>{ try{ return localStorage.getItem('pigpa_lastErr')||''; }catch(e){ return ''; } };
+const noteErr=m=>{ try{ localStorage.setItem('pigpa_lastErr',new Date().toLocaleTimeString()+' '+String(m).slice(0,120)); }catch(e){} };
+window.addEventListener('error',e=>noteErr((e.message||'error')+(e.lineno?' 行'+e.lineno:'')));
+window.addEventListener('unhandledrejection',e=>noteErr('promise: '+(e.reason?.message||e.reason)));
+// URLの文字を戻す：壊れた %xx があっても、その部分だけ残して他は読む
+function softDecode(x){ return x.replace(/(?:%[0-9A-Fa-f]{2})+/g,run=>{ try{ return decodeURIComponent(run); }catch(e){
+  try{ return new TextDecoder('utf-8').decode(new Uint8Array(run.match(/%[0-9A-Fa-f]{2}/g).map(h=>parseInt(h.slice(1),16)))); }catch(_){ return run; } } }); }
+const RAW_KEY='pigpa_rawIn';
+// 受け取った文字を名前に直して保存する（辞書を待たない）
+function processRaw(raw,via){
+  const blocks=raw.replace(/\s+/g,'').split(/(?:%0A|%0D|%20)*(?:=|%3D){3,}(?:%0A|%0D|%20)*/i).map(b=>softDecode(b).trim()).filter(Boolean);
+  if(!blocks.length){ saveRecv({blocks:0,kept:0,len:raw.length,via}); toast(raw.length ? 'ショートカットのスクショから文字が読めませんでした。\nゲームのアイテム画面のスクショか確かめてください' : 'ショートカットから文字が届きませんでした。\nURLの「#b=」（または「#t=」）のすぐあとに、エンコードした文字が入っているか確かめてください'); return; }
+  const list=blocks.map(parseBlock).filter(r=>r?.name);
+  saveRecv({blocks:blocks.length,kept:list.length,len:raw.length,via,names:list.map(x=>x.name)});
+  if (!list.length){ toast('ショートカットから受け取ったスクショに、アイテムの画面がありませんでした'); return; }
+  try{ localStorage.setItem(PENDING_KEY,JSON.stringify({at:Date.now(),list})); }catch(e){} renderPendNote(); histAdd(list);
+  const skipped=blocks.length-list.length;
+  toast(`ショートカットから${list.length}枚分の名前を受け取りました`+(skipped?`（アイテム以外のスクショ${skipped}枚は使いません）`:'')+`。\n同じスクショを「アイテム画像を選ぶ」で選んでください`);
+  // 辞書がまだ読み込めていなければ、読み込めたあとで一覧の表記に合わせ直す（まだ画像に使っていない間だけ）
+  if (!dictExact.size) loadItemNames().then(()=>{ if(!dictExact.size) return; let j=null; try{ j=JSON.parse(localStorage.getItem(PENDING_KEY)||'null'); }catch(e){}
+    if (!j?.list?.length) return; const again=blocks.map(parseBlock).filter(r=>r?.name); if (again.length!==j.list.length) return;
+    try{ localStorage.setItem(PENDING_KEY,JSON.stringify({...j,list:again})); }catch(e){} histAdd(again); },()=>{});
+}
+// Base64 で届いた文字を戻す（ショートカットの「Base64エンコード」。URLと間違われる「.」などが入らない）
+function b64ToText(x){ x=x.replace(/%2B/gi,'+').replace(/%2F/gi,'/').replace(/%3D/gi,'=').replace(/\s+|%0A|%0D|%20/gi,'').replace(/-/g,'+').replace(/_/g,'/');
+  while (x.length%4) x+='='; const bin=atob(x); return new TextDecoder('utf-8').decode(Uint8Array.from(bin,c=>c.charCodeAt(0))); }
+function takeHashText(){
+  let raw=null; const mb=location.hash.match(/^#\s*b\s*(?:=|%3D)([\s\S]*)$/i);
+  if (mb){ try{ raw=encodeURIComponent(b64ToText(mb[1])); }catch(e){ raw=''; } }
+  else { const m=location.hash.match(/^#\s*t\s*(?:=|%3D)([\s\S]*)$/i); if(!m) return; raw=m[1]; }
+  try{ localStorage.setItem(RAW_KEY,JSON.stringify({at:Date.now(),raw})); }catch(e){} // 先に保存（途中で読み直しになっても失わない）
+  history.replaceState(null,'',location.pathname); // ?sc=1 なども外す（次のショートカットは別のURLになり、新しく読み込まれる）
+  try{ processRaw(raw,'URL'); }catch(e){ saveRecv({err:String(e?.message||e),len:raw.length}); toast('ショートカットの文字を読み込めませんでした：'+(e?.message||e)); }
+  try{ localStorage.removeItem(RAW_KEY); }catch(e){}
+}
+// 受け取った直後に読み直しなどで処理が終わらなかった文字があれば、ここで処理する（10分以内のものだけ）
+function recoverRaw(){ if (location.hash) return; let j=null; try{ j=JSON.parse(localStorage.getItem(RAW_KEY)||'null'); }catch(e){}
+  try{ localStorage.removeItem(RAW_KEY); }catch(e){}
+  if (j?.raw && Date.now()-j.at<10*60e3) try{ processRaw(j.raw,'URL（読み直し後）'); }catch(e){} }
+// ショートカットから受け取った名前があるかを、画像を選ぶボタンの下に出しておく（受け取れているか目で分かるように）
+function renderPendNote(){ const el=$('pendNote'); let j=null; try{ j=JSON.parse(localStorage.getItem(PENDING_KEY)||'null'); }catch(e){}
+  const ok=j && Date.now()-j.at<30*60e3 && j.list?.length;
+  el.hidden=!ok; if (ok){ const min=Math.max(0,Math.round((Date.now()-j.at)/60e3));
+    el.textContent= j.used ? `📱 ショートカットの名前（${j.list.length}枚分・${min}分前）は、あと${Math.max(0,30-min)}分使えます。選び直しても当てはめます`
+      : `📱 ショートカットから${j.list.length}枚分の名前を受け取っています（${min}分前）。画像を選ぶと当てはめます`; } }
+setInterval(renderPendNote,30000); setTimeout(renderPendNote,0);
+// 受け取った名前は30分のあいだ何度でも使える（画像を選び直しても当てはめる）。2回目からは、画面の数字か名前が合うものだけに使う
+function pendingInfo(){ try{ const j=JSON.parse(localStorage.getItem(PENDING_KEY)||'null'); return j && Date.now()-j.at<30*60e3 && j.list?.length ? {list:j.list, used:!!j.used} : {list:[],used:false}; }catch(e){ return {list:[],used:false}; } }
+function pendingList(){ return pendingInfo().list; }
+// iPhoneで読んだ名前を残しておく（古いスクショを選んだときも、同じ画面の数字と名前の近さで探して使う）。名前と数字だけなので軽い
+const HIST_KEY='pigpa_iphHist', HIST_MAX=3000;
+function histAll(){ try{ return JSON.parse(localStorage.getItem(HIST_KEY)||'[]'); }catch(e){ return []; } }
+function histAdd(list){ const h=histAll(), key=e=>e.name+'|'+(e.sig||[]).slice().sort().join(',');
+  const seen=new Map(h.map((e,k)=>[key(e),k]));
+  for (const e of list){ if (!e?.name) continue; const o={name:e.name, owned:e.owned??null, noGift:!!e.noGift, sig:e.sig||[], at:Date.now()};
+    const k=seen.get(key(o)); if (k!=null) h[k]=o; else { seen.set(key(o),h.length); h.push(o); } }
+  h.sort((a,b)=>a.at-b.at); try{ localStorage.setItem(HIST_KEY,JSON.stringify(h.slice(-HIST_MAX))); }catch(e){} }
+// 画面から読めた文字（名前・数字）に合う、前にiPhoneで読んだ名前を探す。決めきれなければ null（赤のまま手で直す）
+function histMatch(raw,sig){ const h=histAll(); if (!h.length) return null; const a=normName(raw||''), S=new Set(sig||[]);
+  const sc=e=>{ const n=(e.sig||[]).filter(x=>S.has(x)), b=normName(e.name||''), nc=a&&b ? editCost(a,b)/Math.max(a.length,b.length) : 9;
+    return {e, nn:n.filter(x=>x[0]==='n').length, nd:n.filter(x=>x[0]==='d').length, nc}; };
+  // 数字（欲しい数など3桁以上）が一致すれば同じ画面。リリース日だけなら同じガチャの別アイテムもあるので名前も近いこと
+  const ok=c=>(c.nn>=1 && c.nc<=.6) || (c.nd>=1 && c.nc<=.35) || c.nc<=.2;
+  const cs=h.map(sc).filter(ok).sort((x,y)=>(y.nn-x.nn)||(y.nd-x.nd)||(x.nc-y.nc));
+  if (!cs.length) return null; const b=cs[0];
+  // 同じくらい当てはまる別の名前があるときは決めない
+  if (cs.some(c=>c.e.name!==b.e.name && c.nn===b.nn && c.nd===b.nd && Math.abs(c.nc-b.nc)<.1)) return null;
+  return b.e; }
+function markPendingUsed(){ try{ const j=JSON.parse(localStorage.getItem(PENDING_KEY)||'null'); if (j){ j.used=true; localStorage.setItem(PENDING_KEY,JSON.stringify(j)); } }catch(e){} renderPendNote(); }
+function clearPending(){ try{ localStorage.removeItem(PENDING_KEY); }catch(e){} renderPendNote(); }
+function nearestPending(raw,pend,sig,strict){ const u0=uniqSigs(pend), u=strict ? s=>u0(s).filter(x=>x[0]==='n') : u0;
+  const bySig=pend.map(p=>sigScore(u(sig),u(p.sig))), top=Math.max(0,...bySig);
+  if (top>0 && bySig.filter(x=>x===top).length===1) return pend[bySig.indexOf(top)]; // その1枚にしかない数字が一致すればそれ
+  const cand=top>0 ? pend.filter((_,k)=>bySig[k]===top) : pend; // 数字で同点なら、その中から名前の近いもの
+  const a=normName(raw); let best=cand[0], bd=Infinity; for (const p of cand){ const d=editCost(a,normName(p.name||'')); if (d<bd){ bd=d; best=p; } }
+  // strict（2回目以降の使用）：数字の一致がなく、名前も半分以上違えば当てはめない
+  if (strict && !top && !(a && best && bd/Math.max(a.length,normName(best.name||'').length,1)<=.6)) return null;
+  return best; }
+window.addEventListener('hashchange',takeHashText); takeHashText(); recoverRaw();
+// 前に開いていたページが戻ってきたとき（Safariの「戻る」やタブの復元）も受け取る
+window.addEventListener('pageshow',()=>{ takeHashText(); renderPendNote(); });
+document.addEventListener('visibilitychange',()=>{ if (!document.hidden){ takeHashText(); renderPendNote(); } });
+window.addEventListener('storage',e=>{ if (e.key===PENDING_KEY) renderPendNote(); });
+// ---- 新しい版の確認：古いページのままだとショートカットの文字を受け取れないので、開いたときに新しい版があれば読み直す ----
+(async()=>{ try{
+  const r=await fetch(location.pathname+'?vc='+Date.now(),{cache:'no-store'}); if(!r.ok) return;
+  const v=((await r.text()).match(/const APP_VER='([^']+)'/)||[])[1]; if(!v || !(+v > +APP_VER)) return; // 新しい版のときだけ
+  let tried=null; try{ tried=sessionStorage.getItem('pigpa_reloadFor'); }catch(e){}
+  if (tried===v) return; // 同じ版のために何度も読み直さない
+  try{ sessionStorage.setItem('pigpa_reloadFor',v); }catch(e){}
+  if (!picking && !shotImg && items.length===0){ location.replace(location.pathname+'?v='+v); } // まだ画像を選んでいなければ自動で読み直す（受け取った名前は端末に保存済み）
+  else toast('新しい版があります。画面を下に引っぱって読み直してください');
+}catch(e){} })();
+// ---- 読み取った名前の確認（辞書と完全一致＝緑、違う＝赤。赤が残っている間はコピーしない） ----
+const nameOk=n=>!!n && (dictExact.has(n) || Object.values(learned.all()).some(v=>(v?.to??v)===n));
+// 'ok'＝一覧・覚えた名前と一致（緑）、'iph'＝一覧にないがiPhoneで読んだ名前（黄・コピーできる）、'ng'＝赤
+const nameStatus=e=>nameOk(e.name)?'ok':(e.iph&&e.name?'iph':'ng');
+function nameEntries(){ return items.length>1 ? items.map((it,i)=>({i, name:it.name||'', raw:it.raw||'', reading:it.reading, iph:it.iph, noGift:it.noGift, skip:!!it.skip}))
+  : (shotImg ? [{i:0, name:shotName, raw:shotRaw, reading:shotReading, iph:shotIph, noGift:shotNoGift, skip:false}] : []); }
+function warnNoGift(){ const ng=nameEntries().filter(e=>e.noGift); if (ng.length) toast(`⚠ プレゼント禁止のアイテムがあります\n${ng.map(e=>`${e.i+1}. ${e.name||'（名前なし）'}`).join('\n')}`); }
+function setEntryName(i,v){ if (items.length>1){ items[i].name=v; items[i].iph=false; } else { shotName=v; shotIph=false; } renderNames(); }
+function renderNames(){
+  const box=$('names'); box.innerHTML='';
+  nameEntries().forEach(e=>{ const d=document.createElement('div'); const st=nameStatus(e);
+    d.className='nmRow '+(e.reading&&!e.name?'wait':st);
+    d.innerHTML=`<span class="no">${e.i+1}</span><span class="t"></span><span class="st">${e.reading&&!e.name?'読取中':st==='ok'?'一覧と一致':st==='iph'?'iPhoneで読んだ':e.name?'一覧にない':'読めず'}</span>`;
+    d.querySelector('.t').textContent=e.name||'（名前なし）'; d.onclick=()=>openFix(e.i);
+    if (e.noGift){ const g=document.createElement('span'); g.className='st ng-gift'; g.style.cssText='background:#ff5a6e;color:#fff'; g.textContent='🚫プレゼント禁止'; d.querySelector('.t').after(g); d.style.borderColor='#ff5a6e'; }
+    if (e.name){ const cp=document.createElement('button'); cp.type='button'; cp.className='cp'; cp.textContent='📋コピー';
+      cp.onclick=async ev=>{ ev.stopPropagation(); toast(await copyText(e.name) ? `「${e.name}」をコピーしました` : 'コピーできませんでした'); };
+      d.appendChild(cp); }
+    if (items.length>1){ const tx=document.createElement('button'); tx.type='button'; tx.className='tx'+(e.skip?' off':''); tx.textContent=e.skip?'文字に入れない':'文字に入れる';
+      tx.setAttribute('aria-label','このアイテムを文字・題名に入れるかを切り替える');
+      tx.onclick=ev=>{ ev.stopPropagation(); items[e.i].skip=!items[e.i].skip; renderNames(); };
+      d.appendChild(tx); if (e.skip) d.classList.add('skip'); }
+    if (items.length>1){ const b=document.createElement('button'); b.type='button'; b.className='rm'; b.textContent='✕'; b.setAttribute('aria-label','このアイテムを外す');
+      b.onclick=ev=>{ ev.stopPropagation(); if (b.dataset.sure){ removeItem(e.i); } else { b.dataset.sure=1; b.classList.add('sure'); b.textContent='外す？'; setTimeout(()=>{ if(b.isConnected){ delete b.dataset.sure; b.classList.remove('sure'); b.textContent='✕'; } },3000); } };
+      d.appendChild(b); }
+    box.appendChild(d); });
+}
+// 複数アイテムから1つ外す。1つだけ残ったら、その画像を1個の表示に切り替える
+function removeItem(i){
+  const [gone]=items.splice(i,1); if (gone?.src) try{ URL.revokeObjectURL(gone.src); }catch(e){}
+  if (items.length===1){ const it=items[0]; items=[]; shotImg=it.img; shotName=it.name||''; shotRaw=it.raw||''; shotReading=!!it.reading;
+    $('owned').value=it.owned||''; $('count').value=it.count ?? ''; $('ownSnap').src=it.snap||''; $('ownSnap').hidden=!it.snap; $('ownState').textContent=it.owned?'自動':'読取×';
+    const W=it.img.width; if (it.top!=null && it.cardBottom){ $('ct').value=+((it.top/W)*100).toFixed(1); $('cs').value=+(((it.cardBottom-it.top)/W)*100).toFixed(1); } }
+  renderItems(); renderNames(); draw(); toast(`${i+1}番を外しました`);
+}
+let fixIdx=0;
+async function openFix(i){
+  fixIdx=i; const e=nameEntries()[i]; if(!e) return;
+  $('fixInput').value=e.name; $('fixMsg').textContent=e.raw&&e.raw!==e.name?`読み取った文字：${e.raw}`:'読み取った文字をもとに、近い名前を出しています';
+  $('fixSheet').hidden=false; $('fixCands').innerHTML='<div class="note">候補をさがしています…</div>';
+  const names=await loadItemNames(); const q=normName(e.raw||e.name||''); if(!q){ $('fixCands').innerHTML=''; return; }
+  const scored=[]; for (const n of names){ const b=normName(n); if (Math.abs(b.length-q.length)>6) continue; scored.push([editCost(q,b),n]); }
+  for (const p of pendingList()) if (p.name) scored.push([editCost(q,normName(p.name))-0.5,p.name]);
+  scored.sort((a,b)=>a[0]-b[0]); const box=$('fixCands'); box.innerHTML=''; const seen=new Set();
+  scored.filter(([,n])=>!seen.has(n)&&seen.add(n)).slice(0,8).forEach(([d,n],k)=>{ const b=document.createElement('button'); b.type='button'; b.className='cand'+(k===0?' best':''); b.innerHTML='<span></span><small></small>';
+    b.firstChild.textContent=n; b.lastChild.textContent=d<=0.5?'ほぼ一致':d<=1.5?'近い':''; b.onclick=()=>applyFix(n,true); box.appendChild(b); });
+}
+function applyFix(v,learn){ v=v.trim(); if(!v) return; const e=nameEntries()[fixIdx]; if(!e) return;
+  if (learn){ const ks=[e.raw, e.iph?e.name:''].filter(k=>k&&k!==v); // iPhoneで読んだ名前も覚える（次に同じ読みが届いたら直した名前にする）
+    if (ks.length) ks.forEach(k=>learned.add(k,v)); else learned.add(v,v); }
+  setEntryName(fixIdx,v); $('fixSheet').hidden=true; toast(nameOk(v)?'直しました':'直しました（一覧にない名前です）'); }
+$('fixUse').onclick=()=>applyFix($('fixInput').value,true);
+$('fixAsIs').onclick=()=>{ const v=$('fixInput').value.trim(); if(!v) return; learned.add(v,v); applyFix(v,false); };
+$('fixClose').onclick=()=>{ $('fixSheet').hidden=true; };
+// コピーの前の確認：赤い名前があれば止めて、直す画面を開く
+function namesReady(){ const bad=nameEntries().find(e=>!e.skip && nameStatus(e)==='ng');
+  if(!bad){ const ng=nameEntries().filter(e=>e.noGift && !e.skip); if (ng.length && !confirm(`プレゼント禁止のアイテムが入っています。\n${ng.map(e=>`${e.i+1}. ${e.name}`).join('\n')}\n\nこのままコピーしますか？`)) return false; return true; }
+  toast(bad.reading?'まだ読み取り中です':'赤い名前を直してください（一覧にない名前）'); if(!bad.reading) openFix(bad.i); return false; }
 
 // ---- 複数アイテム（2〜12個）：選んだ順に並べる ----
 let items=[];
@@ -459,12 +723,46 @@ async function setItems(files){
   items=list;
   if (bad) toast(`読み込めない画像が${bad}枚あったので飛ばしました`);
   if (files.length>12) toast('13個以上は選べないので、最初の12個を使います');
-  renderItems(); draw();
+  // ショートカットから受け取った名前・所持数があれば、選んだ順に当てはめる（読み取り後に画面の文字で並びを直す）
+  const pinfo=pendingInfo(), pend=pinfo.list;
+  if (pend.length===items.length && !pinfo.used) items.forEach((it,i)=>{ const p=pend[i]; it.name=p.name; it.iph=true; it.noGift=!!p.noGift; if (p.owned) it.owned=p.owned; }); // 枚数が同じなら、まず撮った順に当てはめる
+  renderItems(); renderNames(); draw();
   for (const it of items){ try{ const r=await analyzeShot(it.img); if (seq!==ocrSeq) return;
-      if (r?.owned) it.owned=r.owned;
-      it.snap=r?.snap; it.name=r?.name; it.raw=r?.raw; if (r?.cardBottom){ it.ownedBottom=r.ownedBottom; it.nameBottom=r.nameBottom; it.cardBottom=r.cardBottom; it.top=r.top ?? Math.max(0,r.squareBottom-it.img.width); }
-    }catch(e){} it.reading=false; renderItems(); draw(); }
+      if (r?.owned && !(pend.length && it.owned)) it.owned=r.owned;
+      it.snap=r?.snap; it.raw=r?.raw; it.ocrName=r?.name; it.sig=r?.sig; if (!it.iph) it.name=r?.name; if (r?.noGift){ it.noGift=true; it.ocrNoGift=true; } if (r?.cardBottom){ it.ownedBottom=r.ownedBottom; it.nameBottom=r.nameBottom; it.cardBottom=r.cardBottom; it.top=r.top ?? Math.max(0,r.squareBottom-it.img.width); }
+    }catch(e){} it.reading=false; renderItems(); renderNames(); draw(); }
+  if (pend.length && (pend.length!==items.length || items.length>=2)){ // 画面から読めた文字と受け取った名前を見比べて、いちばん近いものどうしを組にする
+    // 数字が1つでも一致すれば強く組にする（一致した数が多いほど強い）。数字で決まらなければ名前の近さ
+    // 1枚にしかない数字が一致すれば強く組にする（同点は名前の近さで決める）。数字で決まらなければ名前の近さだけで、半分以上違えば組にしない
+    const u=uniqSigs(pend,items);
+    const cost=(i,j)=>{ const a=normName(items[i].raw||''), b=normName(pend[j].name||''), nc=a&&b ? editCost(a,b)/Math.max(a.length,b.length) : 9;
+      const sc=sigScore(u(items[i].sig),u(pend[j].sig)); return sc>0 ? -sc+Math.min(nc,1)*0.1 : nc; };
+    const pairs=[]; items.forEach((_,i)=>pend.forEach((_,j)=>pairs.push([cost(i,j),i,j]))); pairs.sort((a,b)=>a[0]-b[0]);
+    const usedI=new Set(), usedJ=new Set(), pick=[];
+    for (const [c,i,j] of pairs){ if (c>.6 || usedI.has(i)||usedJ.has(j)) continue; usedI.add(i); usedJ.add(j); pick[i]=j; } // 半分以上違うものは組にしない
+    // 同じアイテムの画像が2枚以上あるとき：組にならなかった画像も、数字が一致するか名前がほぼ同じなら同じ名前を使う
+    items.forEach((_,i)=>{ if (pick[i]!=null) return; let bj=null, bc=Infinity;
+      pend.forEach((_,j)=>{ const c=cost(i,j); if (c<bc){ bc=c; bj=j; } });
+      const sameNum=bj!=null && (items[i].sig||[]).some(x=>x[0]==='n' && (pend[bj].sig||[]).includes(x) && pend.filter(p=>(p.sig||[]).includes(x)).length===1);
+      if (bj!=null && (sameNum || (bc>=0 && bc<=.3)) && pick.some((j)=>j===bj)) pick[i]=bj; });
+    // 文字で組にできなかった画像は、残った名前を撮った順に当てはめる（枚数が同じとき）。それもなければアプリ内の読み取り
+    const rest=pend.map((_,j)=>j).filter(j=>!usedJ.has(j));
+    if (pend.length===items.length && !pinfo.used) items.forEach((_,i)=>{ if (pick[i]==null && rest.length) pick[i]=rest.shift(); }); // 撮った順で当てはめるのは1回目だけ
+    let moved=0; items.forEach((it,i)=>{ const j=pick[i];
+      if (j==null){ if (useHist(it)) return; it.iph=false; it.name=it.ocrName||it.name; it.noGift=!!it.ocrNoGift; return; }
+      const p=pend[j]; if (it.name!==p.name) moved++; it.name=p.name; it.iph=true; it.noGift=!!(p.noGift||it.ocrNoGift); if (p.owned) it.owned=p.owned; });
+    const miss=items.map((_,i)=>i).filter(i=>pick[i]==null && !items[i].fromHist).map(i=>i+1);
+    if (miss.length) toast(`${miss.join('・')}番は、ショートカットで読んだ中にありませんでした。\nスクショを撮ったあとに、もう一度ショートカットを動かしてください`);
+    else if (pend.length!==items.length) toast(`ショートカットの${pend.length}枚分のうち、${usedJ.size}枚を選んだ画像に当てはめました`);
+    else if (moved) toast('画像と名前の対応を直しました');
+    renderItems(); renderNames(); draw();
+  }
+  if (!pend.length && items.map(useHist).some(Boolean)){ renderItems(); renderNames(); draw(); } // 受け取ったものがなくても、前に読んだ名前があれば使う
+  if (pend.length) markPendingUsed();
+  warnNoGift();
 }
+function useHist(it){ const h=histMatch(it.raw||it.ocrName||'',it.sig); if (!h) return false;
+  it.name=h.name; it.iph=true; it.fromHist=true; it.noGift=!!(h.noGift||it.ocrNoGift); if (h.owned && it.count==null) it.owned=h.owned; return true; }
 function renderItems(){
   const box=$('multi'); document.body.classList.toggle('isMulti',items.length>1);
   if (items.length<2){ box.innerHTML=''; return; }
@@ -766,10 +1064,10 @@ $('dl').onclick=()=>{ const name='piggparty-'+Date.now()+'.png';
   },'image/png'); };
 try{ const v=localStorage.getItem('pigpa_titleTotal'); if(v!==null) $('titleTotal').checked=v==='1'; }catch(e){}
 $('titleTotal').addEventListener('change',()=>{ try{ localStorage.setItem('pigpa_titleTotal',$('titleTotal').checked?'1':'0'); }catch(e){} });
-['txtStyle','titleOne','txtHead','txtTotal','txtFoot'].forEach(id=>{ try{ const v=localStorage.getItem('pigpa_'+id); if(v!==null) $(id).value=v; }catch(e){}
+['txtStyle','titleOne','titleSep','txtHead','txtTotal','txtFoot'].forEach(id=>{ try{ const v=localStorage.getItem('pigpa_'+id); if(v!==null) $(id).value=v; }catch(e){}
   $(id).addEventListener('input',()=>{ try{ localStorage.setItem('pigpa_'+id,$(id).value); }catch(e){} }); });
 function listText(){
-  const list = items.length>1 ? items.map(it=>({name:it.name||'（名前を読み取れませんでした）', n:itemCount(it)}))
+  const list = items.length>1 ? items.filter(it=>!it.skip).map(it=>({name:it.name||'（名前を読み取れませんでした）', n:itemCount(it)}))
     : (shotImg ? [{name:shotName||'（名前を読み取れませんでした）', n:countValue()??0}] : []);
   const rows=list.filter(x=>x.n>0);
   if (!rows.length) return '';
@@ -784,22 +1082,29 @@ function listText(){
   return parts.join('\n\n');
 }
 function titleText(){ // タイトル用：アイテム名×数だけ
-  const list = items.length>1 ? items.map(it=>({name:it.name||'', n:itemCount(it)})) : (shotImg ? [{name:shotName||'', n:countValue()??0}] : []);
+  const list = items.length>1 ? items.filter(it=>!it.skip).map(it=>({name:it.name||'', n:itemCount(it)})) : (shotImg ? [{name:shotName||'', n:countValue()??0}] : []);
   const rows=list.filter(x=>x.n>0); if(!rows.length) return '';
-  const t=rows.map(x=>x.n===1&&$('titleOne').value==='hide' ? x.name : `${x.name}×${x.n}`).join(' ');
-  return rows.length>1 && $('titleTotal').checked ? `${t} 計${rows.reduce((a,x)=>a+x.n,0)}点` : t;
+  const sep=$('titleSep').value==='sp' ? ' ' : '\n';
+  const t=rows.map(x=>x.n===1&&$('titleOne').value==='hide' ? x.name : `${x.name}×${x.n}`).join(sep);
+  return rows.length>1 && $('titleTotal').checked ? `${t}${sep}計${rows.reduce((a,x)=>a+x.n,0)}点` : t;
 }
 async function copyText(t){
   try{ await navigator.clipboard.writeText(t); return true; }
   catch(e){ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); let ok=false; try{ ok=document.execCommand('copy'); }catch(_){} ta.remove(); return ok; } }
-$('copyTxt').onclick=async()=>{ const t=listText(); if(!t){ toast('アイテム画像を選んでください'); return; }
-  const ok=await copyText(t); $('txtBox').value=t; txtShown=t; $('txtSheet').hidden=false;
-  $('txtMsg').textContent= ok ? 'コピーしました。読み間違いがあれば直して「もう一度コピー」' : 'コピーできませんでした。下の文字を長押ししてコピーしてください'; };
+try{ const v=localStorage.getItem('pigpa_autoCopy'); if(v!==null) $('autoCopy').checked=v==='1'; }catch(e){}
+$('autoCopy').addEventListener('change',()=>{ try{ localStorage.setItem('pigpa_autoCopy',$('autoCopy').checked?'1':'0'); }catch(e){} });
+async function showCopy(t,label){
+  $('txtBox').value=t; txtShown=t; $('txtSheet').hidden=false;
+  if (!$('autoCopy').checked){ $('txtCopy').textContent='コピー'; $('txtMsg').textContent=label+'：内容を確認して「コピー」を押してください'; return; }
+  $('txtCopy').textContent='もう一度コピー';
+  const ok=await copyText(t);
+  $('txtMsg').textContent= ok ? label+'をコピーしました。読み間違いがあれば直して「もう一度コピー」' : 'コピーできませんでした。下の文字を長押ししてコピーしてください'; }
+$('copyTxt').onclick=()=>{ const t=listText(); if(!t){ toast('アイテム画像を選んでください'); return; } if(!namesReady()) return; showCopy(t,'文字'); };
 // 直した文字から、各アイテムの正しい名前を取り出して覚える（次からは同じ読み間違いを自動で直す）
 let txtShown='';
 function learnFromEdit(before,after){
   if (before===after) return 0;
-  const targets = items.length>1 ? items : (shotImg ? [{get name(){return shotName}, set name(v){shotName=v}, get raw(){return shotRaw}}] : []);
+  const targets = items.length>1 ? items : (shotImg ? [{get name(){return shotName}, set name(v){shotName=v}, get raw(){return shotRaw}, get iph(){return shotIph}}] : []);
   // 直す前と後の文字を1文字ずつ対応させる（個数や他の行を直していても、名前の部分だけ取り出せるように）
   const A=[...before], B=[...after], n=A.length, m=B.length;
   if (n*m>4e6) return 0;
@@ -816,17 +1121,15 @@ function learnFromEdit(before,after){
     const s0=toIdx(chars.slice(0,k)), e0=s0+toIdx(t.name); pos=k+t.name.length;
     const v=B.slice(startOf(s0),endOf(e0)).join('').trim().replace(/\s*[×xX]\s*\d+\s*$/,''); // 名前のすぐ後ろに足した「×3」は外す
     if (!v || v===t.name || /\n|[×xX]\s*\d/.test(v) || v.length>40) continue; // 名前以外まで含んでしまったら覚えない
-    learned.add(t.raw||t.name, v);
+    learned.add(t.raw||t.name, v); if (t.iph && t.raw && t.raw!==t.name) learned.add(t.name, v);
     for (const u of targets) if (u!==t && u.name===t.name) u.name=v;   // 同じ名前のアイテムはまとめて直す
     t.name=v; learnedN++;
   }
   return learnedN;
 }
-$('txtCopy').onclick=async()=>{ const v=$('txtBox').value, n=learnFromEdit(txtShown,v); txtShown=v;
+$('txtCopy').onclick=async()=>{ const v=$('txtBox').value, n=learnFromEdit(txtShown,v); txtShown=v; renderNames(); $('txtCopy').textContent='もう一度コピー';
   toast((await copyText(v)?'コピーしました':'コピーできませんでした')+(n?`（${n}個の名前を覚えました）`:'')); };
-$('copyTitle').onclick=async()=>{ const t=titleText(); if(!t){ toast('アイテム画像を選んでください'); return; }
-  const ok=await copyText(t); $('txtBox').value=t; txtShown=t; $('txtSheet').hidden=false;
-  $('txtMsg').textContent= ok ? 'タイトル用にコピーしました。読み間違いがあれば直して「もう一度コピー」' : 'コピーできませんでした。下の文字を長押ししてコピーしてください'; };
+$('copyTitle').onclick=()=>{ const t=titleText(); if(!t){ toast('アイテム画像を選んでください'); return; } if(!namesReady()) return; showCopy(t,'題名'); };
 $('txtClose').onclick=()=>{ $('txtSheet').hidden=true; };
 $('outClose').onclick=()=>{ $('out').hidden=true; };
 draw();
