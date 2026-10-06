@@ -304,7 +304,7 @@
 
 <script src="ocr/tesseract.min.js"></script>
 <script>
-const APP_VER='1'; // 変えたら上げる（古いページを読み直すための目印）
+const APP_VER='2'; // 変えたら上げる（古いページを読み直すための目印）
 document.getElementById('verLabel').textContent='v'+APP_VER;
 const S = 1254;
 // アイテム画像の位置・サイズは常に固定（正方形）
@@ -453,14 +453,15 @@ async function readLine(img,x,y,w,h,psm='7',thr=150){
 // ピグパの画面から、切り抜き位置・アイテム名・所持数を読む（画像そのものは変更しない）
 async function analyzeShot(img){
   const W=img.width, lay=detectLayout(img);
-  if (!lay) return null;
-  const r={top:lay.top, cardBottom:lay.bottom, nameBottom:lay.bottom, squareBottom:lay.bottom, ownedBottom:lay.bottom};
+  if (!lay && !window.Tesseract) return null;
+  const r=lay ? {top:lay.top, cardBottom:lay.bottom, nameBottom:lay.bottom, squareBottom:lay.bottom, ownedBottom:lay.bottom} : {};
   if (!window.Tesseract) return r;
   const base=new URL('ocr/',location.href).href;
   // 通信が止まって「読取中…」のままにならないよう、時間を区切る（初回は文字認識のデータを読み込むので長め）
   ocrReady ??= Tesseract.createWorker('jpn',1,{workerPath:base+'worker.min.js',corePath:base,langPath:base,workerBlobURL:false}).catch(e=>{ ocrReady=null; throw e; });
   ocrWorker ??= await timeLimit(ocrReady, 90000);
   const clean=t=>t.replace(/\s/g,'').replace(/[□口回ロ⑮Ⅱ|｜!！」』\[\]]+$/,'');
+  if (!lay) return await readWhole(img,r);
   // アイテム名：見出しの線のすぐ下の1行（左端〜右端）
   try{ r.name=fixKana(clean(await readLine(img, W*.015, lay.top+W*.005, W*.97, W*.075))); }catch(e){}
   // 所持数：水色の画像の右上の小さな枠
@@ -476,6 +477,21 @@ async function analyzeShot(img){
   try{ sigT+='\n'+await readLine(img, W*.78, lay.blueBottom-W*.075, W*.21, W*.07, '7', 170); }catch(e){}
   r.sig=numSig(sigT);
   try{ await ocrWorker.setParameters({tessedit_pageseg_mode:'3'}); }catch(e){}
+  // 名前か所持数が読めなかったとき（画面の位置がずれたスクショなど）は、画面全体を読んで補う
+  if (!r.name || !r.owned) return await readWhole(img,r);
+  if (r.name){ r.raw=r.name; r.name=await nearestItemName(r.name); }
+  return r;
+}
+// 画面全体を読み、ショートカットと同じ方法で名前・所持数・数字を取り出す（位置が分からない画面でも名前を出すため）
+async function readWhole(img,r){
+  try{ const k=Math.min(1,1100/img.width), c=document.createElement('canvas'); c.width=img.width*k; c.height=img.height*k;
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    await ocrWorker.setParameters({tessedit_pageseg_mode:'3'});
+    const {data}=await timeLimit(ocrWorker.recognize(c),40000), t=data.text||'';
+    const b=parseBlock(t);
+    if (b){ if (!r.name && b.name){ r.name=fixKana(b.name.replace(/\s/g,'')); } if (!r.owned && b.owned) r.owned=b.owned; if (b.noGift) r.noGift=true; }
+    r.sig=[...new Set([...(r.sig||[]),...numSig(t)])];
+  }catch(e){}
   if (r.name){ r.raw=r.name; r.name=await nearestItemName(r.name); }
   return r;
 }
@@ -536,7 +552,9 @@ function parseBlock(t){
   const lines=t.split(/\n/).map(l=>l.trim()).filter(Boolean), flat=t.replace(/\s/g,'');
   // ピグパの「アイテム詳細」画面だけを使う（所持数・リリース日・ダブり数のどれかが写っている）
   if (!/所持数|リリース日|ダブり数/.test(flat) || APP_SCREEN.test(flat)) return null;
-  const m=flat.match(/所持数[^0-9]*(\d+)/), owned=m?+m[1]:null;
+  // 所持数：「所持数」と同じ行の数（なければ次の行が数だけのとき）。離れた所の数（ほしいの数など）は使わない
+  const oi=lines.findIndex(l=>/所持数/.test(l.replace(/\s/g,''))), om=oi<0?null:(lines[oi].replace(/\s/g,'').match(/所持数\D{0,2}(\d{1,4})/) || (/^\d{1,4}$/.test((lines[oi+1]||'').replace(/\s/g,''))?[0,lines[oi+1].replace(/\s/g,'')]:null));
+  const owned=om?+om[1]:null;
   const noGift=NOGIFT.test(flat), sig=numSig(t), DN=dictNorm();
   const ex=lines.map(l=>DN.get(l.normalize('NFKC'))||DN.get(stripIcon(l))).find(Boolean); if (ex) return {name:ex, owned, iph:true, noGift, sig};
   // 名前の行：「リリース日」の行のすぐ上。なければ「アイテム詳細」の見出しの下
