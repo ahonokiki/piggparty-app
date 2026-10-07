@@ -304,7 +304,7 @@
 
 <script src="ocr/tesseract.min.js"></script>
 <script>
-const APP_VER='3'; // 変えたら上げる（古いページを読み直すための目印）
+const APP_VER='4'; // 変えたら上げる（古いページを読み直すための目印）
 document.getElementById('verLabel').textContent='v'+APP_VER;
 const S = 1254;
 // アイテム画像の位置・サイズは常に固定（正方形）
@@ -980,10 +980,12 @@ function puffy(parts,k,edge,col='#f82da1'){
   ctx.drawImage(c,0,0);
 }
 // 「×数」を右端 right・ベースライン base に、数字の高さ h で描く
-function drawCount(num,right,base,h,edge){
+// left を渡すと左端そろえ（ピグパは左下に置く）
+function drawCount(num,right,base,h,edge,left){
   const {base:fb,px}=fontPx(h), k=h/205, SX=1.08, fN=setF(fb,px), fX=setF(fb,px*.66);
   const m=document.createElement('canvas').getContext('2d');
   m.font=fN; const wN=m.measureText(num).width*SX; m.font=fX; const wX=m.measureText('×').width;
+  if (left!=null) right=left+wX+18*k+wN;
   puffy([{t:num,f:fN,x:right-wN,y:base,sx:SX},{t:'×',f:fX,x:right-wN-18*k-wX,y:base-26*k}],k,edge,$('numColor').value);
 }
 // ネオン風のフチ（k: 太さの倍率）
@@ -1028,7 +1030,7 @@ function draw(){
   ctx.restore();
   neon(x,y,size,size,R,edge,1);
   const cnt=countValue();
-  if ($('showCount').checked && cnt!==null) drawCount(String(cnt),1194,262,205,edge);
+  if ($('showCount').checked && cnt!==null) drawCount(String(cnt),0,BOX.y+BOX.size+70,205,edge,60); // 左下
 }
 
 // 複数アイテム：選んだ順に左上から並べ、下に「計○点」
@@ -1055,7 +1057,7 @@ function drawMulti(edge){
   });
   if (!$('showCount').checked) return;
   const ht=Math.max(60,cw*.24); // 各カードの×数字の高さ
-  cards.forEach(({x,y,it})=>drawCount(String(itemCount(it)),x+cw+ht*.18,y+ht*.62,ht,edge));
+  cards.forEach(({x,y,it})=>drawCount(String(itemCount(it)),0,y+ch-ht*.06,ht,edge,x+ht*.04)); // 左下（下の「計○点」と重ならないよう、カードの内側に）
   // 合計○個（数字を大きく）
   const total=items.slice(0,n).reduce((a,it)=>a+itemCount(it),0);
   const {base:fb,px}=fontPx(150), fBig=setF(fb,px), fSm=(()=>{ const {f,w}=jfontCss(); return `${w} ${Math.round(px*.52)}px "${f}"`; })();
