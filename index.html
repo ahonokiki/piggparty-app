@@ -206,6 +206,9 @@
 
   <section class="card"><h2>×数字</h2><div class="in">
     <div class="row"><label><input type="checkbox" id="showCount" checked> ×数字を表示する</label></div>
+    <div class="row"><label>画像の「所持数」 <select id="hideOwned"><option value="">そのまま出す</option><option value="blend">消す：周りの色でなじませる</option><option value="white">消す：白い枠のまま数字だけ消す</option><option value="mosaic">消す：モザイク</option><option value="sticker">消す：シール（絵文字）で隠す</option></select></label></div>
+    <div class="row" id="stickerRow"><label>シールの絵文字 <input type="text" id="ownedSticker" value="🎀💗" maxlength="8" style="width:7em;border:2px solid #ffd0e6;border-radius:12px;padding:6px 8px;font-size:18px"></label>
+      <span id="stickerPick"></span></div>
     <div class="row"><label><input type="checkbox" id="showOwnedChk"> 画像に「所持数」の行を入れる</label></div>
     <div class="row"><div style="width:100%"><b style="color:#8a5a86;font-size:14px">数字の書体（タップで選択）</b>
 <input type="hidden" id="font" value="10"><div id="fontGrid"></div></div></div>
@@ -304,7 +307,7 @@
 
 <script src="ocr/tesseract.min.js"></script>
 <script>
-const APP_VER='5'; // 変えたら上げる（古いページを読み直すための目印）
+const APP_VER='6'; // 変えたら上げる（古いページを読み直すための目印）
 document.getElementById('verLabel').textContent='v'+APP_VER;
 const S = 1254;
 // アイテム画像の位置・サイズは常に固定（正方形）
@@ -347,6 +350,39 @@ $('openSet').onclick=()=>{ $('settings').hidden=false; renderLearned(); renderRe
 const closeSet=()=>{ $('settings').hidden=true;  };
 $('closeSet').onclick=closeSet; $('settings').addEventListener('click',e=>{ if(e.target.id==='settings') closeSet(); });
 $('showCount').addEventListener('change',draw);
+// 画像の「所持数」の消し方（設定に保存）
+['hideOwned','ownedSticker'].forEach(id=>{ try{ const v=localStorage.getItem('pigpa_'+id); if(v!==null) $(id).value=v; }catch(e){}
+  $(id).addEventListener('input',()=>{ try{ localStorage.setItem('pigpa_'+id,$(id).value); }catch(e){} $('stickerRow').hidden=$('hideOwned').value!=='sticker'; draw(); }); });
+$('stickerRow').hidden=$('hideOwned').value!=='sticker';
+['🎀💗','💖','🎀','⭐','🌸','🐰','🍓','✨'].forEach(e=>{ const b=document.createElement('button'); b.type='button'; b.textContent=e; b.style.cssText='border:0;background:#fff;border-radius:10px;font-size:18px;margin:2px;padding:2px 6px;cursor:pointer';
+  b.onclick=()=>{ $('ownedSticker').value=e; $('ownedSticker').dispatchEvent(new Event('input')); }; $('stickerPick').appendChild(b); });
+// 「所持数」の白い枠：水色の画像の右上にある、白い横長の範囲（画像ごとに1回だけ探す）
+const ownedBoxes=new WeakMap();
+function ownedBoxOf(img){ if (ownedBoxes.has(img)) return ownedBoxes.get(img);
+  let box=null; try{ const lay=detectLayout(img); if (lay){ const W=img.width, X0=Math.round(W*.6), c=document.createElement('canvas'); c.width=W-X0; c.height=Math.round(W*.15);
+    const g=c.getContext('2d',{willReadFrequently:true}); g.drawImage(img,X0,lay.blueTop,W-X0,c.height,0,0,W-X0,c.height);
+    let bx=W, by=null, bb=null, br=0;
+    for (let y=0;y<c.height;y++){ const d=g.getImageData(0,y,c.width,1).data; let f=-1,l=-1; for (let x=0;x<c.width;x++){ const i=x*4; if(d[i]>245&&d[i+1]>245&&d[i+2]>245){ if(f<0) f=x; l=x; } }
+      if (f>=0 && l-f>W*.12){ if(by==null) by=y; bb=y; bx=Math.min(bx,X0+f); br=Math.max(br,X0+l); } else if (by!=null) break; }
+    if (by!=null && bb-by>W*.02) box={x:bx-2,y:lay.blueTop+by-2,w:br-bx+5,h:bb-by+5}; } }catch(e){}
+  ownedBoxes.set(img,box); return box; }
+// 設定に合わせて「所持数」を消した画像（同じ設定の間は作り直さない）
+const maskedCache=new WeakMap();
+function srcOf(img){ const mode=$('hideOwned').value; if (!mode) return img;
+  const box=ownedBoxOf(img); if (!box) return img;
+  const key=mode+'|'+$('ownedSticker').value, hit=maskedCache.get(img); if (hit?.key===key) return hit.c;
+  const c=document.createElement('canvas'); c.width=img.width; c.height=img.height; const g=c.getContext('2d',{willReadFrequently:true}); g.drawImage(img,0,0);
+  const {x,y,w,h}=box;
+  if (mode==='blend' || mode==='sticker'){ // 枠の上と下の色を縦につなぐ（シールのときも、まず消してから貼る）
+    const up=g.getImageData(x,y-3,w,1).data, dn=g.getImageData(x,y+h+3,w,1).data, id=g.createImageData(w,h);
+    for (let j=0;j<h;j++){ const t=(j+1)/(h+1); for (let i=0;i<w*4;i++) id.data[j*w*4+i]=up[i]*(1-t)+dn[i]*t; }
+    g.putImageData(id,x,y); }
+  else if (mode==='white'){ g.fillStyle='#fff'; g.beginPath(); g.roundRect(x+3,y+3,w-6,h-6,Math.min(10,h/3)); g.fill(); }
+  else if (mode==='mosaic'){ const s=Math.max(6,h/4), sm=document.createElement('canvas'); sm.width=Math.ceil(w/s); sm.height=Math.ceil(h/s);
+    sm.getContext('2d').drawImage(c,x,y,w,h,0,0,sm.width,sm.height); g.imageSmoothingEnabled=false; g.drawImage(sm,0,0,sm.width,sm.height,x,y,w,h); }
+  if (mode==='sticker'){ const t=$('ownedSticker').value.trim()||'🎀'; let fs=h*1.5; g.font=`${fs}px sans-serif`; const tw=g.measureText(t).width; if (tw>w*1.1){ fs*=w*1.1/tw; g.font=`${fs}px sans-serif`; }
+    g.textAlign='center'; g.textBaseline='middle'; g.fillText(t,x+w/2,y+h/2); }
+  maskedCache.set(img,{key,c}); return c; }
 // ×数字・「計○点」の色（この端末に保存）
 const TEXT_COLORS=[['ピンク','#f82da1'],['レッド','#f0304f'],['オレンジ','#ff7a1a'],['イエロー','#f2b300'],['グリーン','#22b35e'],
   ['ミント','#12b8a6'],['ブルー','#2f86ff'],['パープル','#8a5cf0'],['ブラウン','#9a5b3c'],['ブラック','#3a2f3f']];
@@ -1025,7 +1061,7 @@ function draw(){
   if (shotImg){
     const W=shotImg.width, side=Math.min(W*$('cs').value/100, W), top=W*$('ct').value/100;
     ctx.imageSmoothingQuality='high';
-    ctx.drawImage(shotImg,(W-side)/2,top,side,side,x,y,size,size);
+    ctx.drawImage(srcOf(shotImg),(W-side)/2,top,side,side,x,y,size,size);
   }
   ctx.restore();
   neon(x,y,size,size,R,edge,1);
@@ -1052,7 +1088,7 @@ function drawMulti(edge){
     ctx.save(); rr(x,y,cw,ch,r); ctx.clip(); ctx.fillStyle='#fff'; ctx.fillRect(x,y,cw,ch);
     const W=it.img.width; ctx.imageSmoothingQuality='high';
     // 画面ごとに切り抜く高さが違う（ダブり数の行があるか等）ので、その画面の範囲だけを描き、余った下側は白のまま
-    const hh=Math.min(W*ar, it.cardBottom-it.top); ctx.drawImage(it.img,0,it.top,W,hh,x,y,cw,cw*hh/W); ctx.restore();
+    const hh=Math.min(W*ar, it.cardBottom-it.top); ctx.drawImage(srcOf(it.img),0,it.top,W,hh,x,y,cw,cw*hh/W); ctx.restore();
     neon(x,y,cw,ch,r,edge,Math.max(.5,k*1.4));
   });
   if (!$('showCount').checked) return;
