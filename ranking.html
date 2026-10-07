@@ -38,10 +38,23 @@
   .sold small{font-size:11px;font-weight:800}
   .sub{grid-column:2/4;display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
   .sub b{color:var(--ink)}
+  .up{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:99px;background:#ff6fae;color:#fff;font-size:11px;font-weight:900;vertical-align:2px;white-space:nowrap}
   .empty{padding:26px;text-align:center;color:var(--sub);font-size:14px;line-height:1.7}
   .note{font-size:12px;color:var(--sub);line-height:1.7;margin:14px 4px}
   label.chk{display:flex;align-items:center;gap:6px;font-size:13px;margin-top:8px}
   .link{background:none;border:0;color:#d0508a;font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:0}
+  li{cursor:pointer}
+  .detail{grid-column:1/4;background:#fff6fa;border-radius:14px;padding:8px 10px;margin-top:4px;font-size:12px}
+  .detail .top{display:flex;gap:10px;align-items:flex-start}
+  .detail img{width:72px;height:72px;object-fit:cover;border-radius:10px;background:#fff;border:2px solid #ffd0e6;flex:none}
+  .detail .noimg{width:72px;height:72px;border-radius:10px;background:#f3eef5;color:var(--sub);font-size:10px;display:flex;align-items:center;justify-content:center;text-align:center;flex:none}
+  .deal{display:flex;gap:8px;align-items:center;padding:5px 0;border-top:1px dashed var(--line);font-variant-numeric:tabular-nums}
+  .deal:first-child{border-top:0}
+  .deal .d{flex:none;color:var(--sub);width:34px}.deal .p{flex:none;font-weight:900;color:#e0468f;width:62px;text-align:right}
+  .deal .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .deal a{flex:none;color:#d0508a;font-weight:900;text-decoration:none;border:2px solid #ffd0e6;border-radius:99px;padding:2px 8px;background:#fff}
+  .gt{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:8px 14px;border-radius:99px;background:linear-gradient(135deg,#a98be0,#c38fd8);color:#fff;font-weight:900;text-decoration:none;font-size:13px}
+  .detail .nm2{font-weight:900;font-size:13px;margin-bottom:4px;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -65,12 +78,19 @@
     <div class="row seg kind" id="kind">
       <button type="button" data-k="item" class="on">単品アイテム</button><button type="button" data-k="gacha">ガチャ・セット</button>
     </div>
+    <div class="row seg" id="sortBy">
+      <button type="button" data-s="sold" class="on">売れた数順</button><button type="button" data-s="up">急上昇順</button><button type="button" data-s="rate">売れやすさ順</button>
+    </div>
+    <div class="meta" id="kindNote"></div>
     <input type="search" id="q" placeholder="名前で絞り込み" autocomplete="off">
     <div class="meta" id="meta"></div>
     <ol id="list"></ol>
     <p class="note">
-      ゲームトレード（ピグパ）の新着出品を毎日記録し、一覧から消えて「取引が終了しました」になったものを売れた数として数えています（記録を始めた日より前の分はありません）。
-      単価は「双子分」「3点セット」などを1個あたりに直した値段の真ん中の値です。売れるまでの日数は、出品を初めて見つけてから売れるまでの平均です（記録を始めた日にすでに出ていた出品は、いつ出品されたか分からないので入れていません）。
+      ゲームトレード（ピグパ）の新着出品（最大99ページ）を1日2回（3:47・15:47）記録し、出品ページが「取引が終了しました」になったものを売れた数として数えています（記録を始めた日より前の分はありません）。
+      「売れた日」は、ページに出ている購入時刻から求めています（分からないときは確認した日）。確認と確認の間に出品されて売れてしまった分は入りません。30日以上動きのない出品は追いかけるのをやめます。「1日」は直近24時間です。<br>
+      「2個（1件・出品者1人）」は、売れた個数・取引の件数・売った人の数です。1人がまとめて売っただけなのか、いろいろな人から売れているのかの目安になります。
+      単価は「双子分」「3点セット」などを1個あたりに直した値段の真ん中の値です（専用出品やまとめ出品など1個の値段が分からないものは単価に入れていません）。
+      売れるまでの日数は、出品を初めて見つけてから売れるまでの平均です（記録を始めた日にすでに出ていた出品や、再出品で上がってきたものは入れていません）。
       問い合わせ用の仮の値段や、たくさんのアイテムをまとめた出品は除いています。<br>
       <button type="button" class="link" id="forget">この端末の合言葉を消す</button>
     </p>
@@ -90,17 +110,56 @@ async function openData(pass){
   const text=await new Response(new Blob([plain]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
   return JSON.parse(text);
 }
-let DATA=null, period='d7', kind='item';
-try{ period=localStorage.getItem('pigrk_period')||period; kind=localStorage.getItem('pigrk_kind')||kind; }catch(e){}
+let DATA=null, period='d7', kind='item', sortBy='sold';
+try{ sortBy=localStorage.getItem('pigrk_sort')||sortBy; period=localStorage.getItem('pigrk_period')||period; kind=localStorage.getItem('pigrk_kind')||kind; }catch(e){}
 const yen=n=>n==null?'—':'¥'+n.toLocaleString('ja-JP');
 const LABEL={d1:'1日',d3:'3日',d7:'1週間',d14:'2週間',d30:'1か月'};
+const GT='https://gametrade.jp/pigg-party/exhibits', CDN='https://cdn.gametrade.jp/0/exhibit_image/file/';
+let openKey=null; // 開いている詳細（名前＋種類）
+function detailOf(r){
+  const d=document.createElement('div'); d.className='detail';
+  const top=document.createElement('div'); top.className='top';
+  const im=r.im||r.list?.find(x=>x.im)?.im;
+  if (im){ const i=document.createElement('img'); i.loading='lazy'; i.alt=''; i.src=CDN+im; i.onerror=()=>i.replaceWith(Object.assign(document.createElement('div'),{className:'noimg',textContent:'写真なし'})); top.append(i); }
+  else top.append(Object.assign(document.createElement('div'),{className:'noimg',textContent:'写真は次の集計から'}));
+  const info=document.createElement('div'); info.style.flex='1'; info.style.minWidth='0';
+  const nm=document.createElement('div'); nm.className='nm2'; nm.textContent=r.name; info.append(nm);
+  const a=document.createElement('a'); a.className='gt'; a.target='_blank'; a.rel='noopener'; a.href=`${GT}?keyword=${encodeURIComponent(r.name)}&sort=new`; a.textContent='🔎 ゲームトレードで検索'; info.append(a);
+  top.append(info); d.append(top);
+  const ul=document.createElement('div'); ul.style.marginTop='8px';
+  (r.list||[]).forEach(x=>{ const row=document.createElement('div'); row.className='deal';
+    const dd=document.createElement('span'); dd.className='d'; dd.textContent=x.d?x.d.slice(5).replace('-','/'):'';
+    const pp=document.createElement('span'); pp.className='p'; pp.textContent=yen(x.p)+(x.q>1?`/${x.q}個`:'');
+    const tt=document.createElement('span'); tt.className='t'; tt.textContent=x.t;
+    const ln=document.createElement('a'); ln.href=`${GT}/${x.id}`; ln.target='_blank'; ln.rel='noopener'; ln.textContent='出品ページ';
+    row.append(dd,pp,tt,ln); ul.append(row); });
+  if (!(r.list||[]).length){ const n=document.createElement('div'); n.className='meta'; n.textContent='売れた出品の詳細は次の集計から出ます'; ul.append(n); }
+  d.append(ul);
+  const note=document.createElement('div'); note.className='meta'; note.textContent='売れた出品の新しい順（10件まで）。値段は出品の値段（まとめ出品は全部の値段）。タップで閉じる'; d.append(note);
+  d.onclick=e=>{ if (e.target.closest('a')) e.stopPropagation(); };
+  return d;
+}
 function render(){
   document.querySelectorAll('#period button').forEach(b=>b.classList.toggle('on',b.dataset.p===period));
   document.querySelectorAll('#kind button').forEach(b=>b.classList.toggle('on',b.dataset.k===kind));
+  document.querySelectorAll('#sortBy button').forEach(b=>b.classList.toggle('on',b.dataset.s===sortBy));
+  $('kindNote').textContent = kind==='gacha' ? 'ガチャのコンプやまとめ売り（3点以上）の出品を、1セット単位で数えています' : '商品名ごとに、売れた個数を数えています（まとめ出品は商品ごとに分けて数えます）';
   const q=$('q').value.trim().normalize('NFKC').toLowerCase();
   const rows=(DATA[period]||[]).filter(r=>r.kind===kind && (!q||r.name.normalize('NFKC').toLowerCase().includes(q)));
+  // 急上昇：前の同じ長さの期間より売れた数の増えた分。売れやすさ：売れた数÷（売れた数＋出品中）
+  const gain=r=>r.prev==null?0:r.sold-r.prev;
+  if (sortBy==='up') rows.sort((a,b)=>gain(b)-gain(a)||b.sold-a.sold);
+  else if (sortBy==='rate') rows.sort((a,b)=>(b.rateSort??0)-(a.rateSort??0)||b.sold-a.sold);
   const total=rows.reduce((a,r)=>a+r.sold,0);
-  $('meta').textContent=`${DATA.updated} 更新・直近${LABEL[period]}に売れた ${total}個（記録開始 ${DATA.since}）`;
+  const noPrev = rows.length && rows.every(r=>r.prev==null);
+  const at=DATA.updatedAt?new Date(DATA.updatedAt):null;
+  const atText=at?`${at.getMonth()+1}/${at.getDate()} ${at.getHours()}:${String(at.getMinutes()).padStart(2,'0')} 時点`:`${DATA.updated} 更新`;
+  const stale=at&&Date.now()-at.getTime()>20*3600e3;
+  $('meta').textContent=`${atText}・直近${LABEL[period]}に売れた ${total}個（記録開始 ${DATA.since}）`+
+    (stale?'　⚠ 集計が20時間以上止まっています':'')+
+    (sortBy==='up'&&noPrev?'　※比べる前の期間の記録がまだないので、急上昇はまだ出せません':'')+
+    (sortBy==='rate'?'　※売れやすさ＝売れた数÷（売れた数＋今出品中の数）。高いほど、出品が少ないのに売れている（3個未満は—）':'')+
+    (sortBy==='up'?'　※急上昇＝前の同じ長さの期間より2倍以上に増えたもの':'');
   const ol=$('list'); ol.textContent='';
   if(!rows.length){ const d=document.createElement('div'); d.className='empty';
     d.textContent = q ? '見つかりませんでした' : '売れたデータがまだありません。毎日記録しているので、数日たつと出てきます'; ol.append(d); return; }
@@ -109,12 +168,19 @@ function render(){
     li.innerHTML='<span class="rk"></span><span class="nm"></span><span class="sold"></span><span class="sub"></span>';
     li.querySelector('.rk').textContent=i+1;
     li.querySelector('.nm').textContent=r.name;
-    li.querySelector('.sold').innerHTML=`${r.sold}<small>${kind==='gacha'?'セット':'個'}</small>`;
+    if (r.prev!=null && r.sold>=3 && r.sold>=2*r.prev){ const u=document.createElement('span'); u.className='up'; u.textContent=`↑ 前の期間 ${r.prev}→${r.sold}`; li.querySelector('.nm').append(u); }
+    const unit=kind==='gacha'?'セット':'個';
+    li.querySelector('.sold').innerHTML=`${r.sold}<small>${unit}</small>`+(r.deals?`<br><small style="color:var(--sub)">${r.deals}件${r.sellers?`・出品者${r.sellers}人`:''}</small>`:'');
     const sub=li.querySelector('.sub');
     const add=(k,v)=>{ const s=document.createElement('span'); s.append(k+' '); const b=document.createElement('b'); b.textContent=v; s.append(b); sub.append(s); };
-    add(kind==='gacha'?'1セット':'単価',r.price==null?'不明':yen(r.price)+(r.deals>1&&r.low!==r.high?`（${yen(r.low)}〜${yen(r.high)}）`:''));
+    add(kind==='gacha'?'1セット':'単価',r.price==null?'不明':yen(r.price)+(r.priced>1&&r.low!==r.high?`（${yen(r.low)}〜${yen(r.high)}）`:''));
     add('売れるまで',r.days==null?'不明':`${r.days}日`);
     add('出品中',`${r.active}個`+(r.listPrice?` ${yen(r.listPrice)}`:''));
+    if (sortBy==='rate') add('売れやすさ',r.rate==null?'—':`${r.rate}%`);
+    else if (r.rate!=null) add('売れやすさ',`${r.rate}%`);
+    const key=r.kind+'\u0000'+r.name;
+    if (openKey===key) li.append(detailOf(r));
+    li.onclick=e=>{ if (e.target.closest('a')) return; openKey = openKey===key ? null : key; render(); };
     ol.append(li);
   });
 }
@@ -131,6 +197,7 @@ async function unlock(pass,quiet){
 }
 $('unlock').addEventListener('submit',e=>{ e.preventDefault(); const p=$('pass').value; if(p) unlock(p); });
 $('period').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; period=b.dataset.p; try{ localStorage.setItem('pigrk_period',period); }catch(_){} render(); };
+$('sortBy').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; sortBy=b.dataset.s; try{ localStorage.setItem('pigrk_sort',sortBy); }catch(_){} render(); };
 $('kind').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; kind=b.dataset.k; try{ localStorage.setItem('pigrk_kind',kind); }catch(_){} render(); };
 $('q').addEventListener('input',()=>DATA&&render());
 $('forget').onclick=()=>{ try{ localStorage.removeItem('pigrk_pass'); }catch(e){} location.reload(); };
