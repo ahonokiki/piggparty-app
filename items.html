@@ -96,7 +96,8 @@ $('tabs').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; kind=b
   [...$('tabs').children].forEach(x=>x.classList.toggle('on',x===b)); render(true); };
 Promise.all([fetch('items.json',{cache:'no-cache'}).then(r=>r.json()), fetch('data/gametrade-names.json',{cache:'no-cache'}).then(r=>r.ok?r.json():{}).catch(()=>({}))]).then(([j,g])=>{
   const base = j.items || (j.names||[]).map(n=>({n})), have=new Set(base.map(x=>x.n));
-  all = base.concat((g.names||[]).filter(n=>!have.has(n)).map(n=>({n, k:'gt', g:'出品で見た名前'})));
+  const more=(j.more||[]).filter(n=>!have.has(n)); more.forEach(n=>have.add(n)); // ガチャ・ショップのページの表にある名前（ページのないアイテム）
+  all = base.concat(more.map(n=>({n, g:'ガチャ・ショップの表の名前'})), (g.names||[]).filter(n=>!have.has(n)).map(n=>({n, k:'gt', g:'出品で見た名前'})));
   render(true);
   if (j.updated) $('meta').textContent+=`（${j.updated} 更新）`;
 }).catch(()=>{ $('meta').textContent='一覧を読み込めませんでした'; });
