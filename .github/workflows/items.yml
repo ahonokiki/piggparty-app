@@ -8,6 +8,7 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
+    timeout-minutes: 20   # 止まった通信で何時間も待たないように（ふつうは5分ほど）
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
