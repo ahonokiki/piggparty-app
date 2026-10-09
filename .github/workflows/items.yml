@@ -1,13 +1,14 @@
-name: アイテム名一覧を更新（毎日）
+name: アイテム名一覧を更新（毎週）
 on:
   schedule:
-    - cron: '23 11 * * *'   # 毎日 20:23（日本時間）
+    - cron: '23 11 * * 1'   # 毎週月曜 20:23（日本時間）。wiki はもう増えていないので週1回（1回に約110ページ・5分ほど）
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
   update:
     runs-on: ubuntu-latest
+    timeout-minutes: 20   # 止まった通信で何時間も待たないように（ふつうは5分ほど）
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
