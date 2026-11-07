@@ -321,7 +321,7 @@
 
 <script src="ocr/tesseract.min.js"></script>
 <script>
-const APP_VER='11'; // 変えたら上げる（古いページを読み直すための目印）
+const APP_VER='12'; // 変えたら上げる（古いページを読み直すための目印）
 const PFX='pigpa_'; // この端末に保存するときの名前の頭（ポケツイは promo_）
 document.getElementById('verLabel').textContent='v'+APP_VER;
 const S = 1254;
@@ -1696,16 +1696,20 @@ function puffy(parts,k,edge,col='#f82da1'){
   each(ctx,(g,t)=>{ g.shadowColor=edge; g.shadowBlur=3*k; g.strokeStyle=edge; g.lineWidth=OUT+10*k; g.strokeText(t,0,0); });
   each(ctx,(g,t)=>{ g.strokeStyle='#fff'; g.lineWidth=OUT; g.strokeText(t,0,0); });
   ctx.restore();
-  const c=document.createElement('canvas'); c.width=c.height=S; const g=c.getContext('2d');
+  // 重ねる用の下書きは、字のまわりだけの大きさで作る（画像全体の大きさで作ると、12個のときにとても遅い）
+  const mm=document.createElement('canvas').getContext('2d'); let bx0=S,by0=S,bx1=0,by1=0;
+  parts.forEach(q=>{ mm.font=q.f; const m=mm.measureText(q.t), w=m.width*(q.sx||1); bx0=Math.min(bx0,q.x); bx1=Math.max(bx1,q.x+w); by0=Math.min(by0,q.y-(m.actualBoundingBoxAscent||parseFloat(q.f.match(/(\d+(?:\.\d+)?)px/)?.[1]||100))); by1=Math.max(by1,q.y+(m.actualBoundingBoxDescent||0)); });
+  const M=Math.ceil(FAT+60*k+8), ox=Math.floor(Math.max(0,bx0-M)), oy=Math.floor(Math.max(0,by0-M)), cw=Math.max(1,Math.min(S,Math.ceil(bx1+M))-ox), chh=Math.max(1,Math.min(S,Math.ceil(by1+M))-oy);
+  const c=document.createElement('canvas'); c.width=cw; c.height=chh; const g=c.getContext('2d'); g.translate(-ox,-oy);
   each(g,(g,t)=>{ g.fillStyle=g.strokeStyle=col; g.lineWidth=FAT; g.fillText(t,0,0); g.strokeText(t,0,0); });
   g.globalCompositeOperation='source-atop';
   each(g,(g,t)=>{ g.strokeStyle=dark; g.lineWidth=FAT+10*k; g.filter=`blur(${4*k}px)`; g.strokeText(t,0,0); });
   each(g,(g,t)=>{ g.fillStyle=col; g.filter=`blur(${6*k}px)`; g.fillText(t,0,-2*k); });
   each(g,(g,t)=>{ g.fillStyle=glow; g.filter=`blur(${14*k}px)`; g.fillText(t,-10*k,-18*k); g.filter='none'; });
-  const mk=document.createElement('canvas'); mk.width=mk.height=S;
-  each(mk.getContext('2d'),(g,t)=>{ g.fillStyle=g.strokeStyle='#000'; g.lineWidth=FAT; g.fillText(t,0,0); g.strokeText(t,0,0); });
-  g.globalCompositeOperation='destination-in'; g.filter='none'; g.drawImage(mk,0,0);
-  ctx.drawImage(c,0,0);
+  const mk=document.createElement('canvas'); mk.width=cw; mk.height=chh; const mg=mk.getContext('2d'); mg.translate(-ox,-oy);
+  each(mg,(g,t)=>{ g.fillStyle=g.strokeStyle='#000'; g.lineWidth=FAT; g.fillText(t,0,0); g.strokeText(t,0,0); });
+  g.setTransform(1,0,0,1,0,0); g.globalCompositeOperation='destination-in'; g.filter='none'; g.drawImage(mk,0,0);
+  ctx.drawImage(c,ox,oy);
 }
 // 「×数」を右端 right・ベースライン base に、数字の高さ h で描く
 // left を渡すと左端そろえ（ピグパは左下に置く）
@@ -1719,12 +1723,14 @@ function drawCount(num,right,base,h,edge,left){
 // ネオン風のフチ（k: 太さの倍率）
 function neon(x,y,w,h,r,edge,k){
   const EI=EDGE_IN*k, EC=EDGE_CORE*k, o1=EI/2, o2=EI+EC/2, OUTER=EI+EC;
-  const c=document.createElement('canvas'); c.width=c.height=S; const g=c.getContext('2d');
+  // 光るフチの下書きは、枠のまわりだけの大きさで作る（画像全体の大きさで作ると、12個のときにとても遅い）
+  const M=Math.ceil(OUTER+80*k+8), ox=Math.floor(Math.max(0,x-M)), oy=Math.floor(Math.max(0,y-M)), cw=Math.max(1,Math.min(S,Math.ceil(x+w+M))-ox), chh=Math.max(1,Math.min(S,Math.ceil(y+h+M))-oy);
+  const c=document.createElement('canvas'); c.width=cw; c.height=chh; const g=c.getContext('2d'); g.translate(-ox,-oy);
   g.strokeStyle=edge; g.shadowColor=edge; g.lineWidth=EC; g.shadowBlur=24*k;
   for (let n=0;n<3;n++){ g.beginPath(); g.roundRect(x-o2,y-o2,w+o2*2,h+o2*2,r+o2); g.stroke(); }
   g.shadowBlur=0; g.globalCompositeOperation='destination-out';
   g.beginPath(); g.roundRect(x-OUTER,y-OUTER,w+OUTER*2,h+OUTER*2,r+OUTER); g.fill();
-  ctx.drawImage(c,0,0);
+  ctx.drawImage(c,ox,oy);
   ctx.save(); ctx.filter=`blur(${k}px)`;
   ctx.lineWidth=EI+k; ctx.strokeStyle=edge; rr(x-o1,y-o1,w+o1*2,h+o1*2,r+o1); ctx.stroke();
   ctx.lineWidth=EC; ctx.strokeStyle='#fffaff'; ctx.shadowColor='#fff'; ctx.shadowBlur=6*k;
@@ -1738,7 +1744,11 @@ function bestRows(n,ar,gap){ const availW=S-56*2, availH=S-70-215; let best=null
   for (const rows of rowSplits(n)){ const cols=Math.max(...rows), w=Math.min((availW-gap*(cols-1))/cols,(availH-gap*(rows.length-1))/rows.length/ar);
     if (w>bw+0.5){ best=rows; bw=w; } } return best; }
 
-function draw(){
+// 描き直しは、続けて頼まれても1回にまとめる（複数の読み取りが動いているときは少し待ってから。読み取りを止めないように）
+let drawT=0;
+function draw(){ if (drawT) return; drawT=setTimeout(()=>requestAnimationFrame(()=>{ drawT=0; drawNow(); }), itemsBusy && itemsBusy===ocrSeq ? 1500 : 0); }
+function flushDraw(){ if (drawT){ clearTimeout(drawT); drawT=0; } drawNow(); }
+function drawNow(){
   ctx.clearRect(0,0,S,S);
   if (bgImg){ const k=Math.max(S/bgImg.width,S/bgImg.height), w=bgImg.width*k, h=bgImg.height*k;
     ctx.drawImage(bgImg,(S-w)/2,(S-h)/2,w,h); }
@@ -1817,7 +1827,7 @@ dbGet('slots').catch(()=>undefined).then(v=>{ // 端末に保存できない環�
   }).catch(()=>{});
 });
 $('dl').onclick=()=>{ const name='piggparty-'+Date.now()+'.png';
-  cv.toBlob(async blob=>{
+  flushDraw(); cv.toBlob(async blob=>{
     const file=new File([blob],name,{type:'image/png'});
     // 共有メニューが使えるのは単体で開いたときだけ（Claude上のページ内では使えないので、必ず画像表示へ）
     const framed=(()=>{ try{ return window.self!==window.top; }catch(e){ return true; } })();
