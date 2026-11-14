@@ -324,7 +324,7 @@
 
 <script src="ocr/tesseract.min.js"></script>
 <script>
-const APP_VER='20'; // 変えたら上げる（古いページを読み直すための目印）
+const APP_VER='21'; // 変えたら上げる（古いページを読み直すための目印）
 const PFX='pigpa_'; // この端末に保存するときの名前の頭（ポケツイは promo_）
 document.getElementById('verLabel').textContent='v'+APP_VER;
 const S = 1254;
@@ -546,7 +546,8 @@ const ocrOne=f=>{ const p=ocrQ.then(f,f); ocrQ=p.catch(()=>{}); return p; };
 // かなの後の「一」（漢字の いち）は伸ばす音「ー」（「と一緒」は漢字が続くのでそのまま）。iPhoneの読み取りの名前にも使う
 const kanaDash=t=>t.replace(/([ぁ-ゖァ-ヺー])一(?![一-龯々])/g,'$1ー').replace(/ー{2,}/g,'ー');
 // 読み間違えやすいカタカナの補正
-function fixKana(t){ return kanaDash(t.replace(/ン(?=[ャュョ])/g,'シ').replace(/ソ(?=[ャュョ])/g,'シ')
+function fixKana(t){ return kanaDash(t.replace(/[へヘ]{2,}/g,m=>m.includes('ヘ')?'ヘ':'へ') // 「ヘア」の前などで「ヘ」を2〜3回読んだもの（一覧に「へへ」が続く名前はない）
+  .replace(/ン(?=[ャュョ])/g,'シ').replace(/ソ(?=[ャュョ])/g,'シ')
   .replace(/([やゆよヤユヨ])([ゃゅょャュョ])/g,(m,a,b)=>({ゃ:'や',ゅ:'ゆ',ょ:'よ',ャ:'ヤ',ュ:'ユ',ョ:'ヨ'})[b]===a?b:m) // 大小2つに読んだ字（「やゃ」）は小さい字
   .replace(/([ばびぶべぼ])([ぱぴぷぺぽ])|([ぱぴぷぺぽ])([ばびぶべぼ])/g,(m,a,b,c,d)=>(a||c).normalize('NFD')[0]===(b||d).normalize('NFD')[0]?(b||d):m)); } // 「ぼぽ」のように同じ字を2回読んだもの（ひらがなだけ。カタカナの「アップブーツ」は本当にある）
 // アイテム名一覧（items.json）と、この端末で直した名前（学習）で、読み取った名前をいちばん近い名前に置き換える
@@ -560,7 +561,7 @@ const loadItemNames=()=>itemNames ??= Promise.all(['items.json','data/gametrade-
     dictExact=new Set([...names,...itemMore]); return names; }).catch(()=>{ itemNames=null; return []; });
 loadItemNames();
 const normMemo=new Map(); // 同じ名前を何度も比べるので、そろえた形を覚えておく
-const normName=t=>{ let v=normMemo.get(t); if (v==null){ v=t.normalize('NFKC').replace(/[\s・･「」『』【】（）()]/g,'').replace(/[ぁ-ゖ]/g,c=>String.fromCharCode(c.charCodeAt(0)+96)); if (normMemo.size>20000) normMemo.clear(); normMemo.set(t,v); } return v; };
+const normName=t=>{ let v=normMemo.get(t); if (v==null){ v=t.normalize('NFKC').replace(/[〜~]/g,'~').replace(/[\s・･「」『』【】（）()]/g,'').replace(/[ぁ-ゖ]/g,c=>String.fromCharCode(c.charCodeAt(0)+96)); if (normMemo.size>20000) normMemo.clear(); normMemo.set(t,v); } return v; };
 // 保存形式：{正規化した読み取り: {from:読み取った文字, to:直した名前}}
 // 保存できなかったとき（端末の保存がいっぱい）も false を返すだけ。決めた名前は okNames に入れて、開いている間は緑にする
 const learned={ all(){ try{ const m=JSON.parse(localStorage.getItem(PFX+'learned')||'{}'); return m&&typeof m==='object'&&!Array.isArray(m)?m:{}; }catch(e){ return {}; } },
@@ -593,7 +594,7 @@ const nearName=(a,b)=>nameDist(a,b)<=.35;
 const digitsOf=t=>(normName(String(t||'')).match(/\d+/g)||[]).join(',');
 // 本当にあるアイテムの名前（一覧と同じ・iPhoneで読んだことがある）。本当の名前は読み違いではないので、「読み取り→直した名前」の元にしない
 let histNames=null; // 前の記録の名前（毎回作らないよう覚えておく。histAdd で作り直す）
-const realName=t=>{ if (!t) return false; if (dictNorm().has(String(t).normalize('NFKC'))) return true; histNames ??= new Set(histAll().map(e=>normName(e.name))); return histNames.has(normName(t)); };
+const realName=t=>{ if (!t) return false; if (dictNorm().has(nk(t))) return true; histNames ??= new Set(histAll().map(e=>normName(e.name))); return histNames.has(normName(t)); };
 // 文字認識のよくある読み違いだけの違い（小さい字・濁点・ー/一・形の似た字。漢字や数字は変わらない）
 const slip=(a,b)=>{ a=normName(String(a||'')); b=normName(String(b||'')); return !!a && !!b && a!==b && editCost(a,b)<1 && digitsOf(a)===digitsOf(b); };
 // 色の名前（同じシリーズの色ちがいのアイテム）。どちらの名前にも、もう一方にない色の名前があり、色の名前を除くとほとんど同じなら別のアイテム
@@ -653,7 +654,7 @@ function renderLearned(){
 }
 async function nearestItemName(name){
   if (!name) return name;
-  const list=await loadItemNames(), ex=dictNorm().get(name.normalize('NFKC')); if (ex) return ex; // 一覧と同じ名前はそのまま（覚えた直し方より先に見る）
+  const list=await loadItemNames(), ex=dictNorm().get(nk(name)); if (ex) return ex; // 一覧と同じ名前はそのまま（覚えた直し方より先に見る）
   const a=normName(name), lt=learnedTo(name); if (lt) return lt;
   // 比べる相手：[比べる文字, 置き換える名前]。一覧の名前・覚えた名前・覚えた「読み取り」（少し違う読み間違いも直す）
   const cands=list.map(n=>[n,n]);
@@ -714,6 +715,8 @@ async function analyzeShot(img){
   ocrWorker ??= await timeLimit(ocrReady, 90000);
   // 末尾のごみを削る。「ロ」「！」などは名前の一部のこともあるので、1字ずつ削って一覧・前の記録にある名前になればそこで止める
   const clean=t=>{ t=t.replace(/\s/g,''); const all=t.replace(/[□口回ロ⑮Ⅱ|｜!！」』\[\]]+$/,'');
+    // 最後の1字の「口・ロ」は削らない（口のアイテム「〜猫口」、カタカナの「〜マシュマロ」）。ひらがな・漢字の後の「ロ」は「口」と読みちがえたもの
+    if (/[ぁ-ゖァ-ヺ一-龯ー][口ロ]$/.test(t) && !/\/[^/]{1,4}[口ロ]$/.test(t) && !realName(t.slice(0,-1))) return realName(t) || /[ァ-ヺー]ロ$/.test(t) ? t : t.slice(0,-1)+'口';
     for (let x=t; x.length>all.length; x=x.slice(0,-1)) if (!/[」』]$/.test(x) && realName(x)) return x; return all; }; // 」』は前の記録と比べるとき消えるので、付いたままでは止めない
   if (!lay) return await readWhole(img,r);
   // アイテム名：見出しの線のすぐ下の1行（左端〜右端）。長い名前が2行になった画面は、見出しから水色の画像までがふつう（幅の0.13倍、
@@ -851,7 +854,8 @@ const JUNK=/リリース|ほしい|欲しい|所持数|持数|アイテム詳細
 // iPhoneの読み取りはほぼ正確なので、名前の行はそのまま使う（一覧と完全一致・覚えた名前があればそちら）
 // 一覧の名前を NFKC でそろえた形から元の表記を引く（全角の！などを含む名前も一致させる）
 let dictNormMap=null, dictNormSize=-1;
-const dictNorm=()=>{ if (dictNormSize!==dictExact.size){ dictNormMap=new Map(); for (const n of dictExact) dictNormMap.set(n.normalize('NFKC'),n); dictNormSize=dictExact.size; } return dictNormMap; };
+const nk=t=>String(t).normalize('NFKC').replace(/[〜~]/g,'~'); // 「～」と「〜」を同じ字に（一覧と読み取りで書き方がちがうことがある）
+const dictNorm=()=>{ if (dictNormSize!==dictExact.size){ dictNormMap=new Map(); for (const n of dictExact) dictNormMap.set(nk(n),n); dictNormSize=dictExact.size; } return dictNormMap; };
 // このアプリ自身の画面のスクショ（所持数などの文字が写る・名前を直す画面など）は、アイテムの画面として使わない
 const APP_SCREEN=/ピグパ画像加工アプリ|アイテム画像を選ぶ|画像を保存|ショートカットから\d*枚分|ショートカットの名前|枚を使います|名前を直す|この名前で決定|この名前にする|一覧にないけど|iPhoneで読んだ|文字に入れる|一覧と一致|ちがうときは下の候補|ショートカットの作り方|ショートカット連携|受け取るスクショ|最後に受け取った|覚えた名前|決めた名前|画像を長押しして|写真"?”?に保存」/;
 // 写真に保存した完成画像（「計○点」が入る・「所持数」「リリース日」「「欲しい」の数」が2つ以上写る＝2つ以上のアイテムが並ぶ）は、ゲームのスクショではないので使わない
@@ -891,7 +895,7 @@ function parseBlock(t,loose){
   // （空白なしでくっついた見出しのアイコン「詳細?X名前」の「?X」も外す。小文字が続く「Xmas…」の X は外さない）
   const head=hi>=0 ? decorOff(lines[hi].replace(/^.*詳\s*細/,'').replace(/^\s*(?:[?？]\s*(?:[×✕]|[xX](?![a-z]))?|[×✕])\s*/,''),false) : '', tail=ri>=0 ? decorOff(lines[ri].replace(/\s*リリース.*$/,'').replace(/[★☆✩*＊]+$/,''),true) : '';
   const win=hi>=0 && ri>hi ? [head, ...lines.slice(hi+1,ri), tail].filter(Boolean) : null;
-  const exact=l=>DN.get(l.normalize('NFKC'))||DN.get(stripIcon(l))||DN.get(tidyName(stripIcon(l)))||DN.get(kanaDash(tidyName(stripIcon(l))));
+  const exact=l=>DN.get(nk(l))||DN.get(stripIcon(l))||DN.get(tidyName(stripIcon(l)))||DN.get(kanaDash(tidyName(stripIcon(l))));
   // 名前の行：見出しのすぐ下のいちばん上の、文字のある行（年号などの数字・ガチャ／こうかん等の語を含む名前もそのまま使う。★の行は飛ばす）
   // （見出し・リリース日の字は、行の途中にあっても名前にしない：「く アイテム詳細 ? X」「★★ リリース日:…」）
   const nameLike=l=>{ const x=l.replace(/\s/g,''); return [...x].length>=2 && /\p{L}/u.test(x) && !DECOR(l) && !/^[\p{Nd}:：.,/年月日%個?？!！♥♡★☆*＊]+$/u.test(x) && !NOGIFT.test(x) && !/^(リリース|所持数|みんなのダブり|ダブり数|希少|ほしい)/.test(x) && !/アイテム詳細|リリース日/.test(x); };
@@ -1215,7 +1219,7 @@ const starish=w=>{ const x=String(w||'').normalize('NFKC').replace(/\s/g,''), n=
 // iPhoneの読み取りで長い名前の2行目が落ちた（「…ウエハース」まで）ときは、画像から読んだ一覧の名前（「…ウエハースソファ」）を使う
 // （画像から読んだ名前が一覧と同じで、iPhoneの名前（8文字以上・一覧にない）で始まって、それより長いときだけ）
 // 空白・小さい字・濁点だけの違い（「…セット アップ」「だあく…」）や、後ろに★の行の読み違い（「…ボトムス 女」）が付いただけのときも、画像から読んだ一覧の名前にする
-const fullName=(p,raw)=>{ const n=p?.name||'', d=raw && dictNorm().get(String(raw).normalize('NFKC')); if (!d || !n || dictExact.has(n)) return n;
+const fullName=(p,raw)=>{ const n=p?.name||'', d=raw && dictNorm().get(nk(raw)); if (!d || !n || dictExact.has(n)) return n;
   const a=normName(d), b=normName(n); return (b.length>=8 && a.length>b.length && a.startsWith(b)) || a===b || slip(n,d) || (a.length>=8 && b.startsWith(a) && starish(b.slice(a.length))) ? d : n; };
 // 所持数：数字で同じ画面と確かめられたときはiPhoneの数。そうでなければ、選んだ画像の「所持数」の枠から確かに読めた数を先に使う
 const pickOwned=(m,p,proven)=>(proven ? (p?.owned||m.owned) : ((m.ownedSure&&m.owned) || p?.owned || m.owned)) || null;
