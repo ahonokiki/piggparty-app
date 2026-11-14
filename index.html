@@ -122,6 +122,25 @@
   .set em{display:none}
   .set b{width:12px;height:12px;border-width:2px;right:-4px;top:-4px}
   .set.on::after{top:-12px;font-size:12px}
+  /* ガチャの背景（上の段）：新しい7つ＋履歴。名前は枠の下 */
+  #gRow{width:100%;display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin:4px 0 0}
+  #gRow[hidden]{display:none}
+  body.hasG main.one .preview{width:min(100%,calc(100dvh - 395px))}
+  .gset{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;border:0;background:none;padding:0;font:inherit;cursor:pointer;min-width:0;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+  .gset i{display:block;width:100%;aspect-ratio:1;border-radius:50%;border:3px solid #fff;background:#f3e6f6 center/cover;box-shadow:0 1px 5px #0003}
+  .gset.on i{border-color:var(--pink);outline:2px solid var(--pink);outline-offset:1px}
+  .gset.on::after{content:"★";position:absolute;left:50%;top:-11px;transform:translateX(-50%);color:#ffd23f;font-size:12px;text-shadow:0 0 3px #fff,0 0 3px #fff}
+  .gset small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;max-width:100%;font-size:8px;line-height:1.2;font-weight:800;color:var(--sub);white-space:normal;overflow-wrap:anywhere;overflow:hidden;text-align:center}
+  .gset.hist i{display:flex;align-items:center;justify-content:center;background:#fff;border:2px dashed var(--lav);font-style:normal;font-size:15px}
+  .gpats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .gpat{display:flex;flex-direction:column;align-items:center;gap:3px;border:3px solid #f3eef5;border-radius:16px;background:#fff;padding:5px;font:inherit;font-size:10.5px;font-weight:800;color:var(--ink);cursor:pointer}
+  .gpat i{display:block;width:100%;aspect-ratio:1;border-radius:12px;background:#f3e6f6 center/cover}
+  .gpat.on{border-color:var(--pink);background:#fff3f9}
+  .ghItem{display:flex;align-items:center;gap:10px;width:100%;border:3px solid #f3eef5;border-radius:16px;background:#fff;padding:6px;margin:6px 0;font:inherit;text-align:left;color:var(--ink);cursor:pointer}
+  .ghItem i{flex:none;width:52px;height:52px;border-radius:50%;background:#f3e6f6 center/cover}
+  .ghItem span{flex:1;min-width:0;font-weight:900;font-size:14px;overflow-wrap:anywhere}
+  .ghItem small{display:block;font-size:11px;font-weight:700;color:var(--sub)}
+  .ghItem.on{border-color:var(--pink);background:#fff3f9}
   .ctrl{width:100%;display:flex;flex-direction:column;gap:8px}
   .pick{width:100%;padding:11px 16px}
   .nums{display:flex;gap:8px;align-items:center;justify-content:space-between}
@@ -196,6 +215,7 @@
 <main class="one">
 <div class="preview"><canvas id="cv" width="1254" height="1254"></canvas></div>
 
+<div id="gRow" hidden></div>
 <div id="sets"></div><input type="file" id="bg" accept="image/*" hidden>
 
 <div class="ctrl">
@@ -306,6 +326,18 @@
 </div></div>
 
 
+<div id="gSheet" class="sheet" hidden><div class="sheetIn">
+  <div class="sheetHead">🎰 ガチャの背景<button class="close" id="gClose" type="button">✕</button></div>
+  <p class="note" id="gNow" style="font-weight:800;margin:12px 0 6px"></p>
+  <section class="card" id="gPatCard"><h2>模様（全部のガチャ共通）</h2><div class="in">
+    <div class="note" style="margin-top:0">ガチャの絵の色だけを使って作ります。選んだ模様は全端末でそろいます（「全端末でそろえる」でつないだとき）。</div>
+    <div class="gpats" id="gPats"></div>
+  </div></section>
+  <section class="card" id="gHistCard"><h2>履歴（全部のガチャ）</h2><div class="in">
+    <div class="note" style="margin-top:0">押すとそのガチャの背景になります。新しい順です。</div>
+    <div id="gHist"></div>
+  </div></section>
+</div></div>
 <div id="out" class="sheet" hidden><div class="sheetIn" style="text-align:center">
   <div class="sheetHead">🎁 完成！<button class="close" id="outClose" type="button">✕</button></div>
   <p style="font-weight:900;color:#8a5a86;margin:14px 0 10px">画像を長押しして「"写真"に保存」を選んでね</p>
@@ -331,7 +363,7 @@
 
 <script src="ocr/tesseract.min.js"></script>
 <script>
-const APP_VER='23'; // 変えたら上げる（古いページを読み直すための目印）
+const APP_VER='24'; // 変えたら上げる（古いページを読み直すための目印）
 const PFX='pigpa_'; // この端末に保存するときの名前の頭（ポケツイは promo_）
 document.getElementById('verLabel').textContent='v'+APP_VER;
 const S = 1254;
@@ -1619,6 +1651,7 @@ function shareSlot(n){ const t=sets[n]; if(!t) return;
 const SLOTS=[['ピンク','#ff7eb6'],['レッド','#ff5a6e'],['オレンジ','#ffa24c'],['イエロー','#ffd23f'],['グリーン','#6fd67a'],
              ['ミント','#4fd8c4'],['ブルー','#5aa9ff'],['パープル','#a98be0'],['ブラウン','#b98a6a'],['グレー','#a8a3ad']];
 let sets = Array(10).fill(null), cur = +(store.get('curSlot')||0), pickSlot = 0;
+let curG = store.get('curGacha')||''; // 選んでいるガチャの背景（history.json の id。空なら背景セット）
 const idb = new Promise((ok,ng)=>{ const r=indexedDB.open('piggparty',1); r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>ok(r.result); r.onerror=()=>ng(r.error); });
 const dbGet = k => idb.then(d=>new Promise(ok=>{ const q=d.transaction('kv').objectStore('kv').get(k); q.onsuccess=()=>ok(q.result); q.onerror=()=>ok(undefined); }));
 const saveSets = () => idb.then(d=>{ const t=d.transaction('kv','readwrite'); t.objectStore('kv').put(sets,'slots'); t.onerror=()=>console.warn('保存できませんでした'); });
@@ -1627,7 +1660,7 @@ const curSet = () => sets[cur];
 function renderSets(){
   const box=$('sets'); box.innerHTML='';
   SLOTS.forEach(([name,col],n)=>{ const t=sets[n], b=document.createElement('button'); b.type='button';
-    b.className='set'+(n===cur?' on':'')+(t?'':' empty')+(t?.shared?' shared':''); b.style.setProperty('--slot',col);
+    b.className='set'+(n===cur&&!curG?' on':'')+(t?'':' empty')+(t?.shared?' shared':''); b.style.setProperty('--slot',col);
     if (t) b.style.backgroundImage=`url(${t.bg})`;
     b.innerHTML=`<em>${name}</em>`+(t?`<b style="background:${t.edge}"></b><span class="del">×</span>`:'<i>＋</i>');
     b.onclick=e=>{
@@ -1643,7 +1676,9 @@ function renderSets(){
     u.style.setProperty('--slot',col); u.textContent='☁ '+name+'を全端末に共有'; u.onclick=()=>shareSlot(n); dl.appendChild(u); });
   if(!dl.children.length) dl.innerHTML='<div class="note">この端末だけで登録した背景セットはありません（共通の背景セットはここでは削除できません）。</div>';
 }
-function selectSet(n){
+function selectSet(n,keep){
+  if (!keep) store.set('curGacha',''); // 背景セットを選んだらガチャの背景はやめる（keep：ガチャが読めず一時的に背景セットを出すときは、次に開いたとき用に残す）
+  if (curG){ curG=''; renderGacha(); }
   cur=n; store.set('curSlot',n); const t=curSet(); renderSets();
   if (!t){ bgImg=null; currentList=[]; renderSwatches([]); draw(); return; }
   const i=new Image(); i.onload=()=>{ bgImg=i; currentList=edgeCandidates(analyzeBg(i)); $('edgeColor').value=t.edge; renderSwatches(currentList); draw(); }; i.src=t.bg;
@@ -1657,6 +1692,103 @@ $('bg').addEventListener('change',()=>{ const f=$('bg').files[0]; if(!f) return;
     if (ghToken()) shareSlot(n);
   });
 });
+// ---- ガチャの背景（上の段）：bg-auto/history.json のガチャの絵の色から、8種類の模様をこの端末の中で作る ----
+// リポジトリには色を取るための小さな縮小（長辺256px）だけを置く。作った画像は IndexedDB にためて使い回す
+// 模様の関数は bg-auto/patterns.js の GachaPat.make（ポコダンの tools/pocodun-bg と同じもの）。模様の設定は全端末でそろえる（SYNC_KEYS の gachaPat。piggparty/data.json でそろう）
+const GPATS=[['pearl','pdWcPearl','水彩＋パール'],['sparkle','pdSparkle','キラキラ'],['bokeh','pdBokeh','光の玉'],['gradient','pdGradient','グラデ'],
+             ['aurora','pdAurora','オーロラ'],['rays','pdRays','放射線'],['holo1','pdHolo1','ホロ＋ラメ'],['holo5','pdHolo5','星柄ホロ']];
+const GTOP=7, GBIG=1080, GSMALL=128; // 上の段に並べる数・背景の大きさ・枠の大きさ
+let gHist=[], gReady=null; // history.json の items（新しい順）・patterns.js を読み終えたら true
+const gPat=()=>{ let v=null; try{ v=localStorage.getItem(PFX+'gachaPat'); }catch(e){} return GPATS.some(p=>p[0]===v) ? v : 'pearl'; };
+const gItem=id=>gHist.find(g=>g.id===id);
+const gEdges=()=>{ try{ return JSON.parse(localStorage.getItem(PFX+'gachaEdge')||'{}')||{}; }catch(e){ return {}; } };
+function gEdgeSet(id,hex){ const m=gEdges(); m[id]=hex; try{ localStorage.setItem(PFX+'gachaEdge',JSON.stringify(m)); }catch(e){} }
+const gVer=()=>String(window.GachaPat?.ver||'1'); // 模様の関数を直すと patterns.js の版が変わる → 作り直す
+const gMem=new Map(), gSrc=new Map(); let gQ=Promise.resolve();
+// 模様の画像（dataURL）を返す。メモリ → IndexedDB → 作る の順。作るのは1つずつ順番に（iPhoneが固まらないように）
+const gKey=(id,pat,size)=>`gbg:${id}:${pat}:${size>GSMALL?size:'t'+size}:${gVer()}`; // 見本は t128（前の粒だらけの 128 は使わない）
+function gMake(it,pat,size){ const k=gKey(it.id,pat,size); if (gMem.has(k)) return gMem.get(k);
+  const p=dbGet(k).catch(()=>undefined).then(v=>{ if (typeof v==='string') return v;
+    return gQ=gQ.catch(()=>{}).then(async()=>{ await new Promise(r=>setTimeout(r,0));
+      if (!gSrc.has(it.img)) gSrc.set(it.img,new Promise((ok,ng)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=ng; i.src=it.img; }));
+      const img=await gSrc.get(it.img), GP=window.GachaPat, fn=GP?.make ? (i,S)=>GP.make(i,pat,S) : window[GPATS.find(x=>x[0]===pat)[1]];
+      if (typeof fn!=='function') throw new Error('模様の関数がありません');
+      // 枠の見本は 540 で作って縮める（小さく作るとラメや光の粒が減らず粒だらけになる）
+      const cv=size>GSMALL ? fn(img,size) : GP?.thumb ? GP.thumb(img,pat,size) : (()=>{ const b=fn(img,540), c=document.createElement('canvas'); c.width=c.height=size;
+        const g=c.getContext('2d'); g.imageSmoothingQuality='high'; g.drawImage(b,0,0,size,size); return c; })();
+      const d=cv.toDataURL('image/jpeg',size>GSMALL?.9:.85);
+      idb.then(db=>{ const t=db.transaction('kv','readwrite'); t.objectStore('kv').put(d,k); }).catch(()=>{});
+      return d; }); });
+  p.catch(()=>gMem.delete(k)); gMem.set(k,p); return p; }
+const gName=it=>it.name+(it.kind && it.kind!=='ガチャ' ? `（${it.kind}）` : '');
+// 作った背景（IndexedDB）の片づけ：前の版の分・前の見本（:128:）・最近使っていない大きい背景（最近の8件と今のものだけ残す）
+const GKEEP=8;
+const gUsed=()=>{ try{ const a=JSON.parse(localStorage.getItem(PFX+'gachaUsed')||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } };
+function gUse(k){ const a=[k,...gUsed().filter(x=>x!==k)].slice(0,GKEEP); try{ localStorage.setItem(PFX+'gachaUsed',JSON.stringify(a)); }catch(e){} }
+function gClean(){ const v=gVer(), keep=new Set(gUsed()); if (curG) keep.add(gKey(curG,gPat(),GBIG));
+  idb.then(d=>{ const q=d.transaction('kv').objectStore('kv').getAllKeys(); q.onsuccess=()=>q.result.forEach(k=>{
+    if (typeof k!=='string' || !k.startsWith('gbg:')) return; const p=k.split(':'), sz=p[p.length-2];
+    if (p[p.length-1]!==v || (sz!=='t'+GSMALL && !keep.has(k))) dbDel(k); }); }).catch(()=>{}); }
+const gThumb=(el,it,pat=gPat())=>gMake(it,pat,GSMALL).then(d=>{ el.style.backgroundImage=`url(${d})`; }).catch(()=>{});
+// 長押し（またはもう一度押す）で模様を選ぶ画面
+function gPress(b,tap,hold){ let t=0, held=false;
+  b.addEventListener('pointerdown',()=>{ held=false; clearTimeout(t); t=setTimeout(()=>{ held=true; hold(); },550); });
+  ['pointerup','pointerleave','pointercancel'].forEach(e=>b.addEventListener(e,()=>clearTimeout(t)));
+  b.addEventListener('contextmenu',e=>e.preventDefault());
+  b.onclick=()=>{ if (held){ held=false; return; } tap(); }; }
+// 枠の下の名前：上の段に頭が同じ名前（◯◯コラボガチャ グループA／B など）があれば、その頭を省いて違う所を出す
+function gShort(it,list){ const n=it.name; let L=0;
+  list.forEach(g=>{ if (g===it) return; let i=0; while (i<n.length && n[i]===g.name[i]) i++; L=Math.max(L,i); });
+  if (L<4 || L>=n.length) return n;
+  const sp=n.lastIndexOf(' ',L-1); // 区切り（空白）まで戻して2行に収まるなら、そこから出す（vol.2ガチャ／グループA）
+  if (sp>0 && n.length-sp-1<=10) return n.slice(sp+1);
+  return '…'+n.slice(n.length-L<3 ? Math.max(0,n.length-5) : L); }
+function renderGacha(){ const box=$('gRow'), show=gReady===true && gHist.length>0; box.hidden=!show; document.body.classList.toggle('hasG',show); if (!show) return;
+  box.innerHTML='';
+  const top=gHist.slice(0,GTOP);
+  top.forEach(it=>{ const b=document.createElement('button'); b.type='button'; b.className='gset'+(it.id===curG?' on':''); b.title=gName(it);
+    b.innerHTML='<i></i><small></small>'; b.querySelector('small').textContent=gShort(it,top); gThumb(b.querySelector('i'),it);
+    gPress(b,()=>{ if (it.id===curG) openGacha('pat'); else selectGacha(it.id,true); },()=>{ if (it.id!==curG) selectGacha(it.id,true); openGacha('pat'); });
+    box.appendChild(b); });
+  const h=document.createElement('button'); h.type='button'; h.className='gset hist'; h.innerHTML='<i>🕘</i><small>履歴</small>'; h.onclick=()=>openGacha('hist'); box.appendChild(h);
+  if (!$('gSheet').hidden) renderGSheet(); }
+function selectGacha(id,user){ const it=gItem(id); if (!it){ curG=''; store.set('curGacha',''); renderGacha(); selectSet(cur); return; }
+  curG=id; store.set('curGacha',id); renderGacha(); renderSets();
+  if (user) toast('🎰 '+gName(it)+(it.date?'（'+it.date+'）':''));
+  const pat=gPat();
+  gMake(it,pat,GBIG).then(d=>{ gUse(gKey(id,pat,GBIG)); if (curG!==id || gPat()!==pat) return; const i=new Image(); i.onload=()=>{ if (curG!==id) return;
+      bgImg=i; currentList=edgeCandidates(analyzeBg(i)); $('edgeColor').value=gEdges()[id+':'+pat]||currentList[0].hex; renderSwatches(currentList); draw(); }; i.src=d; })
+    .catch(()=>{ if (curG===id) toast('ガチャの背景を作れませんでした'); }); }
+// 起動時・背景セットを読み直したとき：ガチャの背景を選んでいればそれ、なければ背景セット
+function showBg(){ if (!curG){ selectSet(cur,true); return; } if (gReady===true) selectGacha(curG); else if (gReady===false){ curG=''; selectSet(cur,true); } else renderSets(); }
+function openGacha(mode){ const s=$('gSheet'); s.hidden=false; renderGSheet();
+  const el=mode==='hist' ? $('gHistCard') : $('gPatCard'); s.querySelector('.sheetIn').scrollTop=mode==='hist' ? el.offsetTop-60 : 0; }
+function renderGSheet(){ const it=gItem(curG)||gHist[0], pat=gPat();
+  $('gNow').textContent=curG&&gItem(curG) ? '今の背景：'+gName(it)+(it.date?'（'+it.date+'）':'') : '背景セットを使っています（下の履歴から選べます）';
+  const pb=$('gPats'); pb.innerHTML='';
+  GPATS.forEach(([k,,label])=>{ const b=document.createElement('button'); b.type='button'; b.className='gpat'+(k===pat?' on':''); b.innerHTML='<i></i>'; b.append(label);
+    if (it) gThumb(b.querySelector('i'),it,k);
+    b.onclick=()=>{ try{ localStorage.setItem(PFX+'gachaPat',k); }catch(e){} gPatChanged(); }; pb.appendChild(b); });
+  const hb=$('gHist'); hb.innerHTML='';
+  gHist.forEach(g=>{ const b=document.createElement('button'); b.type='button'; b.className='ghItem'+(g.id===curG?' on':'');
+    b.innerHTML='<i></i><span></span>'; const sp=b.querySelector('span'); sp.textContent=g.name;
+    const sm=document.createElement('small'); sm.textContent=[g.kind,g.date].filter(Boolean).join('・'); sp.appendChild(sm);
+    gThumb(b.querySelector('i'),g,pat); b.onclick=()=>{ selectGacha(g.id,true); $('gSheet').hidden=true; }; hb.appendChild(b); }); }
+// 模様が変わったとき（この端末で選んだ・ほかの端末からそろった）
+let gPatSeen=gPat(); // そろえで模様が変わったかを見るため
+function gPatChanged(){ gPatSeen=gPat(); renderGacha(); if (!$('gSheet').hidden) renderGSheet(); if (curG) selectGacha(curG); }
+$('gClose').onclick=()=>{ $('gSheet').hidden=true; };
+$('gSheet').addEventListener('click',e=>{ if (e.target.id==='gSheet') $('gSheet').hidden=true; });
+// history.json と patterns.js を読む。どちらかが無い・読めないときは上の段を出さない
+fetch('bg-auto/history.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{
+  const items=(Array.isArray(j)?j:Array.isArray(j?.items)?j.items:[]).filter(g=>g && typeof g.id==='string' && g.name && (g.src||g.img))
+    .map(g=>({...g, img:g.img||'bg-auto/'+g.src})) // src は bg-auto/ の中の縮小jpgの名前
+    .sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  if (!items.length) throw 0; gHist=items;
+  return new Promise((ok,ng)=>{ if (window.GachaPat) return ok();
+    const sc=document.createElement('script'); sc.src='bg-auto/patterns.js?v='+APP_VER; sc.onload=()=>window.GachaPat?ok():ng(); sc.onerror=ng; document.head.appendChild(sc); });
+}).then(()=>{ gReady=true; setTimeout(gClean,3000); }).catch(()=>{ gReady=false; gHist=[]; })
+  .then(()=>{ renderGacha(); if (curG) showBg(); });
 document.addEventListener('paste',e=>{ const f=[...e.clipboardData.files].find(f=>f.type.startsWith('image/')); if(f){ pickFiles=[f]; retried=false; fromFile(f,setShot); } });
 document.addEventListener('dragover',e=>e.preventDefault());
 document.addEventListener('drop',e=>{ e.preventDefault(); const f=[...e.dataTransfer.files].find(f=>f.type.startsWith('image/')); if(f){ pickFiles=[f]; retried=false; fromFile(f,setShot); } });
@@ -1696,7 +1828,8 @@ function renderSwatches(list){
 }
 let currentList=[];
 let edgeTimer=null;
-function saveEdge(){ const t=curSet(); if (!t) return; t.edge=$('edgeColor').value; saveSets(); renderSets();
+function saveEdge(){ if (curG){ gEdgeSet(curG+':'+gPat(),$('edgeColor').value); return; } // ガチャの背景のフチ色は（ガチャ・模様）ごとにこの端末に覚える
+  const t=curSet(); if (!t) return; t.edge=$('edgeColor').value; saveSets(); renderSets();
   if (t.shared){
     if (!ghToken()){ $('edgeNote').textContent='共通の背景セットです。この端末だけに反映されます（全端末に反映するには⚙で鍵を入れてください）。'; return; }
     const n=cur, edge=t.edge; clearTimeout(edgeTimer);
@@ -1854,7 +1987,7 @@ function drawMulti(edge){
 dbGet('slots').catch(()=>undefined).then(v=>{ // 端末に保存できない環境でも共通の背景セットは読む
   if (Array.isArray(v)) sets=v;
   else { try{ JSON.parse(store.get('sets')||'[]').slice(0,10).forEach((t,n)=>sets[n]={bg:t.bg,edge:t.edge}); saveSets(); }catch(e){} } // 旧形式から移行
-  selectSet(Math.min(9,Math.max(0,cur||0)));
+  cur=Math.min(9,Math.max(0,cur||0)); showBg();
   // 全端末共通の背景セット（リポジトリの sets.json）で上書き
   fetch('sets.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{
     if (!j?.sets) return;
@@ -1863,7 +1996,7 @@ dbGet('slots').catch(()=>undefined).then(v=>{ // 端末に保存できない環�
     j.sets.forEach(t=>{ if (t.slot>=0 && t.slot<10){ const mine=sets[t.slot];
       // 直前にこの端末で保存したもの（まだ反映待ち）は手元の画像を使う
       sets[t.slot]= mine?.path===t.bg ? {...mine, edge:t.edge} : {bg:t.bg, edge:t.edge, shared:true}; } });
-    saveSets(); selectSet(cur);
+    saveSets(); if (curG) renderSets(); else selectSet(cur,true);
   }).catch(()=>{});
 });
 $('dl').onclick=()=>{ const name='piggparty-'+Date.now()+'.png';
@@ -1975,7 +2108,7 @@ $('outClose').onclick=()=>{ $('out').hidden=true; };
 // 鍵はポコダンが入れた 'poco_sync'（同じ場所のアプリなので、鍵を1回入れれば3つとも）。公開リポジトリ（背景の共有）には書かない
 // そろえる設定（PFX のあとの名前）。そろえないもの：読み取りの途中・ショートカットの受け取り・前の記録・背景（いまの仕組みのまま）・鍵・一度だけの印
 const SYNC_API='https://api.github.com', SYNC_FILE='piggparty/data.json';
-const SYNC_KEYS=['font','jfont','ct','cs','hideOwned','ownedSticker','numColor','totalColor','showOwned','txtStyle','titleForm','titleOne','titleSep','titleTotal','txtHead','txtTotal','txtFoot','autoCopy'];
+const SYNC_KEYS=['font','jfont','ct','cs','hideOwned','ownedSticker','numColor','totalColor','showOwned','txtStyle','titleForm','titleOne','titleSep','titleTotal','txtHead','txtTotal','txtFoot','autoCopy','gachaPat'];
 // 起動時に自動で書く初期値（fontDefault の書体10番・autoCopyOff1 の自動コピーなし）。時刻0のままこの値なら、自分で決めていない値として送らない・受け取らない
 // （先にそろえた新しい端末の初期値が、使い込んだ端末の書体などを上書きしないように）
 const SYNC_AUTO={font:'10', autoCopy:'0'}, syncAuto=(k,r)=>!(r.t||0) && r.v!=null && SYNC_AUTO[k]===String(r.v);
@@ -2039,7 +2172,8 @@ function applySet(){ const g=k=>{ try{ return localStorage.getItem(PFX+k); }catc
   const {f,w}=jfontCss(); document.fonts.load(`${w} 100px "${f}"`,'計点').then(draw,draw); }
 // そろえで内容が変わったときだけ描き直す。文字を打っている途中なら、欄を離れてから（打ちかけの文字・キーボードを消さない）
 function redrawAfterSync(){ const a=document.activeElement; if (a && (a.tagName==='TEXTAREA' || (a.tagName==='INPUT' && !['checkbox','radio','button','file','color'].includes(a.type)))){ a.addEventListener('blur',()=>setTimeout(redrawAfterSync,0),{once:true}); return; }
-  applySet(); if (!$('settings').hidden) renderLearned(); try{ renderNames(); }catch(e){} draw(); }
+  applySet(); if (!$('settings').hidden) renderLearned(); try{ renderNames(); }catch(e){} draw();
+  if (gPatSeen!==gPat()) gPatChanged(); } // ガチャの背景の模様
 function renderSync(msg){ const e=$('syncState'); if (!e) return; const on=syncOn();
   e.textContent= msg || (!on ? (pocoSync().token ? 'この端末ではやめています（この端末の中だけに保存）' : 'つないでいません（この端末の中だけに保存）') : SINFO.err ? '⚠ そろえられませんでした：'+SINFO.err : SINFO.last ? '✓ そろえました（'+SINFO.last+'）' : 'つなぎました');
   e.style.color= !msg && on && SINFO.err ? '#e0457b' : ''; if (document.activeElement!==$('syncToken')) $('syncToken').value= on ? '••••••••（入っています）' : ''; }
