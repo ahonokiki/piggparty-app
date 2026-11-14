@@ -247,6 +247,7 @@
       <option value="heart">♡ 名前 ×2（×1は省略）</option>
       <option value="plain">名前×2（記号なし）</option>
     </select></div>
+    <div class="row"><label>題名の形（2種類以上のとき） <select id="titleForm"><option value="set">【計○点】1個目の名前 セット</option><option value="list">名前を全部ならべる</option></select></label></div>
     <div class="row"><label>題名の×1 <select id="titleOne"><option value="show">×1も付ける</option><option value="hide">×1は省く</option></select></label></div>
     <div class="row"><label>題名の名前の区切り <select id="titleSep"><option value="nl">改行（1行に1つ）</option><option value="sp">空白（1行にまとめる）</option></select></label></div>
     <div class="row"><label><input type="checkbox" id="titleTotal" checked> 題名に「計○点」を付ける（2個以上のとき）</label></div>
@@ -323,7 +324,7 @@
 
 <script src="ocr/tesseract.min.js"></script>
 <script>
-const APP_VER='15'; // 変えたら上げる（古いページを読み直すための目印）
+const APP_VER='16'; // 変えたら上げる（古いページを読み直すための目印）
 const PFX='pigpa_'; // この端末に保存するときの名前の頭（ポケツイは promo_）
 document.getElementById('verLabel').textContent='v'+APP_VER;
 const S = 1254;
@@ -1839,7 +1840,7 @@ $('dl').onclick=()=>{ const name='piggparty-'+Date.now()+'.png';
   },'image/png'); };
 try{ const v=localStorage.getItem('pigpa_titleTotal'); if(v!==null) $('titleTotal').checked=v==='1'; }catch(e){}
 $('titleTotal').addEventListener('change',()=>{ try{ localStorage.setItem('pigpa_titleTotal',$('titleTotal').checked?'1':'0'); }catch(e){} });
-['txtStyle','titleOne','titleSep','txtHead','txtTotal','txtFoot'].forEach(id=>{ try{ const v=localStorage.getItem('pigpa_'+id); if(v!==null) $(id).value=v; }catch(e){}
+['txtStyle','titleForm','titleOne','titleSep','txtHead','txtTotal','txtFoot'].forEach(id=>{ try{ const v=localStorage.getItem('pigpa_'+id); if(v!==null) $(id).value=v; }catch(e){}
   $(id).addEventListener('input',()=>{ try{ localStorage.setItem('pigpa_'+id,$(id).value); }catch(e){} }); });
 function listText(){
   const list = items.length>1 ? items.filter(it=>!it.skip).map(it=>({name:it.name||'（名前を読み取れませんでした）', n:itemCount(it)}))
@@ -1859,6 +1860,7 @@ function listText(){
 function titleText(){ // タイトル用：アイテム名×数だけ
   const list = items.length>1 ? items.filter(it=>!it.skip).map(it=>({name:it.name||'', n:itemCount(it)})) : (shotImg ? [{name:shotName||'', n:countValue()??0}] : []);
   const rows=list.filter(x=>x.n>0); if(!rows.length) return '';
+  if (rows.length>1 && $('titleForm').value==='set') return `【計${rows.reduce((a,x)=>a+x.n,0)}点】${rows[0].name} セット`; // 例：【計12点】空舞うコーラルウェーブ セット
   const sep=$('titleSep').value==='sp' ? ' ' : '\n';
   const t=rows.map(x=>x.n===1&&$('titleOne').value==='hide' ? x.name : `${x.name}×${x.n}`).join(sep);
   return rows.length>1 && $('titleTotal').checked ? `${t}${sep}計${rows.reduce((a,x)=>a+x.n,0)}点` : t;
