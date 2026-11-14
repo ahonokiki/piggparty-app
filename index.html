@@ -324,7 +324,7 @@
 
 <script src="ocr/tesseract.min.js"></script>
 <script>
-const APP_VER='18'; // 変えたら上げる（古いページを読み直すための目印）
+const APP_VER='19'; // 変えたら上げる（古いページを読み直すための目印）
 const PFX='pigpa_'; // この端末に保存するときの名前の頭（ポケツイは promo_）
 document.getElementById('verLabel').textContent='v'+APP_VER;
 const S = 1254;
@@ -712,11 +712,14 @@ async function analyzeShot(img){
   // 通信が止まって「読取中…」のままにならないよう、時間を区切る（初回は文字認識のデータを読み込むので長め）
   ocrReady ??= Tesseract.createWorker('jpn',1,{workerPath:base+'worker.min.js',corePath:base,langPath:base,workerBlobURL:false}).catch(e=>{ ocrReady=null; throw e; });
   ocrWorker ??= await timeLimit(ocrReady, 90000);
-  const clean=t=>t.replace(/\s/g,'').replace(/[□口回ロ⑮Ⅱ|｜!！」』\[\]]+$/,'');
+  // 末尾のごみを削る。「ロ」「！」などは名前の一部のこともあるので、1字ずつ削って一覧・前の記録にある名前になればそこで止める
+  const clean=t=>{ t=t.replace(/\s/g,''); const all=t.replace(/[□口回ロ⑮Ⅱ|｜!！」』\[\]]+$/,'');
+    for (let x=t; x.length>all.length; x=x.slice(0,-1)) if (!/[」』]$/.test(x) && realName(x)) return x; return all; }; // 」』は前の記録と比べるとき消えるので、付いたままでは止めない
   if (!lay) return await readWhole(img,r);
   // アイテム名：見出しの線のすぐ下の1行（左端〜右端）。長い名前が2行になった画面は、見出しから水色の画像までがふつう（幅の0.13倍、
   // ダブり数の行があれば0.20倍）より約0.046倍長いので、2行分を読んでつなげる（リリース日の行もその分下）
   const wrap=lay.wrap, dy=wrap ? W*.046 : 0;
+  await loadItemNames().catch(()=>{}); // clean で一覧の名前と比べるので、一覧を読み込んでから（読めなければ今までどおり全部削る）
   try{ r.name=fixKana(clean(await readLine(img, W*.015, lay.top+W*.005, W*.97, wrap ? W*.12 : W*.075, wrap ? '6' : '7', 150, false, true))); }catch(e){}
   // 所持数：水色の画像の右上の小さな枠。しきい値190で読み、「所持数」の字と一緒に読めなければ150でもう一度
   // （150だと字がつぶれて「7手褒間」のような読みになり、最後の数字を所持数と取り違えることがある。「数」と一緒に読めた数を優先する）
@@ -1264,7 +1267,7 @@ function renderNames(){
       d.appendChild(cp); }
     if (items.length>1){ const tx=document.createElement('button'); tx.type='button'; tx.className='tx'+(e.skip?' off':''); tx.textContent=e.skip?'文字に入れない':'文字に入れる';
       tx.setAttribute('aria-label','このアイテムを文字・題名に入れるかを切り替える');
-      tx.onclick=ev=>{ ev.stopPropagation(); items[e.i].skip=!items[e.i].skip; renderNames(); };
+      tx.onclick=ev=>{ ev.stopPropagation(); items[e.i].skip=!items[e.i].skip; renderNames(); draw(); };
       d.appendChild(tx); if (e.skip) d.classList.add('skip'); }
     if (items.length>1){ const b=document.createElement('button'); b.type='button'; b.className='rm'; b.textContent='✕'; b.setAttribute('aria-label','このアイテムを外す');
       b.onclick=ev=>{ ev.stopPropagation(); if (b.dataset.sure){ removeItem(e.i); } else { b.dataset.sure=1; b.classList.add('sure'); b.textContent='外す？'; setTimeout(()=>{ if(b.isConnected){ delete b.dataset.sure; b.classList.remove('sure'); b.textContent='✕'; } },3000); } };
@@ -1782,11 +1785,13 @@ function drawNow(){
 
 // 複数アイテム：選んだ順に左上から並べ、下に「計○点」
 function drawMulti(edge){
-  const n=Math.min(items.length,12);
+  // 「文字に入れない」にしたアイテムは画像にも出さない（画像の「計○点」と文字の合計をそろえる。ポケツイと同じ）
+  const its=items.some(it=>!it.skip) ? items.filter(it=>!it.skip) : items;
+  const n=Math.min(its.length,12);
   const PAD=56, TOP=70, FOOT=215, GAP=n>6?34:44;
   // カードの縦横比（アイテム上端〜名前の行まで）
-  items.forEach(it=>{ it.cardBottom = showOwned()&&it.ownedBottom ? it.ownedBottom : (it.nameBottom ?? it.cardBottom); });
-  const ratios=items.map(it=>(it.cardBottom-it.top)/it.img.width).filter(r=>r>0.5&&r<1.6);
+  its.forEach(it=>{ it.cardBottom = showOwned()&&it.ownedBottom ? it.ownedBottom : (it.nameBottom ?? it.cardBottom); });
+  const ratios=its.map(it=>(it.cardBottom-it.top)/it.img.width).filter(r=>r>0.5&&r<1.6);
   // いちばん縦長の画面に合わせる（ダブり数の行がある画面も「入手可能です」の行まで入る。短い画面は下が白くなる）
   const ar=ratios.length? Math.min(1.1,Math.max(...ratios)) : 1;
   const rows=bestRows(n,ar,GAP), cols=Math.max(...rows);
@@ -1795,7 +1800,7 @@ function drawMulti(edge){
   const k=cw/1000, r=Math.max(14,R*k*1.6);
   let y=TOP+(availH-(rows.length*ch+(rows.length-1)*GAP))/2, idx=0;
   const cards=[];
-  rows.forEach(c=>{ let x=(S-(c*cw+(c-1)*GAP))/2; for(let i=0;i<c;i++){ cards.push({x,y,it:items[idx++]}); x+=cw+GAP; } y+=ch+GAP; });
+  rows.forEach(c=>{ let x=(S-(c*cw+(c-1)*GAP))/2; for(let i=0;i<c;i++){ cards.push({x,y,it:its[idx++]}); x+=cw+GAP; } y+=ch+GAP; });
   cards.forEach(({x,y,it})=>{
     ctx.save(); rr(x,y,cw,ch,r); ctx.clip(); ctx.fillStyle='#fff'; ctx.fillRect(x,y,cw,ch);
     const W=it.img.width; ctx.imageSmoothingQuality='high';
@@ -1807,7 +1812,7 @@ function drawMulti(edge){
   const ht=Math.max(60,cw*.24); // 各カードの×数字の高さ
   cards.forEach(({x,y,it})=>drawCount(String(itemCount(it)),0,y+ch-ht*.06,ht,edge,x+ht*.04)); // 左下（下の「計○点」と重ならないよう、カードの内側に）
   // 合計○個（数字を大きく）
-  const total=items.slice(0,n).reduce((a,it)=>a+itemCount(it),0);
+  const total=its.slice(0,n).reduce((a,it)=>a+itemCount(it),0);
   const {base:fb,px}=fontPx(150), fBig=setF(fb,px), fSm=(()=>{ const {f,w}=jfontCss(); return `${w} ${Math.round(px*.52)}px "${f}"`; })();
   const m=document.createElement('canvas').getContext('2d');
   m.font=fSm; const w1=m.measureText('計').width, w3=m.measureText('点').width; m.font=fBig; const w2=m.measureText(String(total)).width;
@@ -1830,6 +1835,9 @@ dbGet('slots').catch(()=>undefined).then(v=>{ // 端末に保存できない環�
   }).catch(()=>{});
 });
 $('dl').onclick=()=>{ const name='piggparty-'+Date.now()+'.png';
+  // 画像がない・読み取り中（×0や途中の合計のまま）の画像は保存しない
+  if (!shotImg && its.length<2){ toast('アイテム画像を選んでください'); return; }
+  if (nameEntries().some(e=>e.reading)){ toast('まだ読み取り中です。少し待ってからもう一度押してください'); return; }
   flushDraw(); cv.toBlob(async blob=>{
     const file=new File([blob],name,{type:'image/png'});
     // 共有メニューが使えるのは単体で開いたときだけ（Claude上のページ内では使えないので、必ず画像表示へ）
@@ -1883,7 +1891,8 @@ $('copyTxt').onclick=()=>{ const t=listText(); if (copyBlocked(t) || !namesReady
 let txtShown='';
 function learnFromEdit(before,after){
   if (before===after) return 0;
-  const targets = items.length>1 ? items : (shotImg ? [{get name(){return shotName}, set name(v){shotName=v}, get raw(){return shotRaw}, get iph(){return shotIph}}] : []);
+  // 文字に入らない行（文字に入れない・×0）は探さない（別の行の名前の一部に当たって、違う行の名前が変わらないように）
+  const targets = items.length>1 ? items.filter(it=>!it.skip && itemCount(it)>0) : (shotImg ? [{get name(){return shotName}, set name(v){shotName=v}, get raw(){return shotRaw}, get iph(){return shotIph}}] : []);
   // 直す前と後の文字を1文字ずつ対応させる（個数や他の行を直していても、名前の部分だけ取り出せるように）
   const A=[...before], B=[...after], n=A.length, m=B.length;
   if (n*m>4e6) return 0;
@@ -1896,14 +1905,26 @@ function learnFromEdit(before,after){
   const toIdx=str=>[...str].length, chars=before; let pos=0, learnedN=0;
   for (const t of targets){
     if (!t.name) continue;
-    const k=chars.indexOf(t.name,pos); if (k<0) continue;            // 同じ名前が2回あっても順番に探す
+    // 同じ名前が2回あっても順番に探す。行の頭・空白・】・の後ろから、行末・空白・×の前までの所だけ（長い名前の一部には当てない）
+    let k=chars.indexOf(t.name,pos);
+    while (k>=0 && !(/^$|[\s】・]/.test(chars[k-1]??'') && /^$|[\s×]/.test(chars[k+t.name.length]??''))) k=chars.indexOf(t.name,k+1);
+    if (k<0) continue;
     const s0=toIdx(chars.slice(0,k)), e0=s0+toIdx(t.name); pos=k+t.name.length;
     const v=B.slice(startOf(s0),endOf(e0)).join('').trim().replace(/\s*[×xX]\s*\d+\s*$/,''); // 名前のすぐ後ろに足した「×3」は外す
     if (!v || v===t.name || /\n|[×xX]\s*\d/.test(v) || v.length>40) continue; // 名前以外まで含んでしまったら覚えない
+    // 名前の前後に言葉を足しただけ（【即購入OK】・美品・〜等など）は名前の直しではない（直した名前が一覧・前の記録にあれば直しとみる）
+    if (!realName(v) && !dictExact.has(v)){
+      if (/[\s【】\[\]]/.test(v)) continue;                                  // 【】・空白で区切って言葉を足した
+      if (v!==t.name && v.endsWith(t.name)) continue;                           // 名前の前に字を足した
+      const V=[...v], nl=[...t.name].length-2; // 元の名前とほぼ同じ長さの所だけ見る（短い一覧の名前に当てない）
+      if (V.some((_,i)=>i>0 && V.length-i>=nl && realName(V.slice(i).join('')))) continue; // 読み違いを直しつつ前に字を足した（後ろが一覧の名前）
+      if (/^(等|他|など)$/.test(v.startsWith(t.name) ? v.slice(t.name.length) : '')) continue; // 「〜等」「〜他」
+      if (V.some((_,i)=>i>=nl && /^(等|他|など)$/.test(V.slice(i).join('')) && realName(V.slice(0,i).join('')))) continue;
+    }
     // 小さな読み違いを直したときだけ「読み取り → 直した名前」を覚える（別アイテム・別の年の名前を直した＝組み違いを覚えると、その本当のアイテムの名前まで書き換わる）
     [learnable(t.raw,v) ? t.raw : '', t.iph && slip(t.name,v) ? t.name : ''].filter(Boolean).forEach(k=>learned.add(k,v)); if (!dictExact.has(v)) learned.add(v,v); okNames.add(v);
     if (items.length>1) t.fixed=true; else shotFixed=true; // 手で直した名前は、あとで書き換えない
-    for (const u of targets) if (u!==t && u.name===t.name){ u.name=v; u.fixed=true; }   // 同じ名前のアイテムはまとめて直す
+    for (const u of (items.length>1 ? items : targets)) if (u!==t && u.name===t.name){ u.name=v; u.fixed=true; }   // 同じ名前のアイテムはまとめて直す
     t.name=v; learnedN++;
   }
   return learnedN;
