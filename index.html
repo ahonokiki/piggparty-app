@@ -324,7 +324,7 @@
 
 <script src="ocr/tesseract.min.js"></script>
 <script>
-const APP_VER='19'; // 変えたら上げる（古いページを読み直すための目印）
+const APP_VER='20'; // 変えたら上げる（古いページを読み直すための目印）
 const PFX='pigpa_'; // この端末に保存するときの名前の頭（ポケツイは promo_）
 document.getElementById('verLabel').textContent='v'+APP_VER;
 const S = 1254;
@@ -1836,7 +1836,7 @@ dbGet('slots').catch(()=>undefined).then(v=>{ // 端末に保存できない環�
 });
 $('dl').onclick=()=>{ const name='piggparty-'+Date.now()+'.png';
   // 画像がない・読み取り中（×0や途中の合計のまま）の画像は保存しない
-  if (!shotImg && its.length<2){ toast('アイテム画像を選んでください'); return; }
+  if (!shotImg && items.length<2){ toast('アイテム画像を選んでください'); return; }
   if (nameEntries().some(e=>e.reading)){ toast('まだ読み取り中です。少し待ってからもう一度押してください'); return; }
   flushDraw(); cv.toBlob(async blob=>{
     const file=new File([blob],name,{type:'image/png'});
