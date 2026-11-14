@@ -331,7 +331,7 @@
 
 <script src="ocr/tesseract.min.js"></script>
 <script>
-const APP_VER='22'; // 変えたら上げる（古いページを読み直すための目印）
+const APP_VER='23'; // 変えたら上げる（古いページを読み直すための目印）
 const PFX='pigpa_'; // この端末に保存するときの名前の頭（ポケツイは promo_）
 document.getElementById('verLabel').textContent='v'+APP_VER;
 const S = 1254;
@@ -574,12 +574,14 @@ const normName=t=>{ let v=normMemo.get(t); if (v==null){ v=t.normalize('NFKC').r
 // 保存できなかったとき（端末の保存がいっぱい）も false を返すだけ。決めた名前は okNames に入れて、開いている間は緑にする
 const learned={ all(){ try{ const m=JSON.parse(localStorage.getItem(PFX+'learned')||'{}'); return m&&typeof m==='object'&&!Array.isArray(m)?m:{}; }catch(e){ return {}; } },
   // 全端末でそろえるため、名前ごとに変えた時刻（t）を持つ。消した名前は消した印（learnedRm：{名前:時刻}）に残す。keep：そろえで受け取った内容（時刻はそのまま）
+  // 時刻は「今」と「その名前の前の時刻・消した印+1」の大きいほう（時計が進んだ端末が付けた先の時刻があっても、あとから変えたほうが勝つように）
   save(m,keep){ try{ if (!keep){ const o=this.all(), now=Date.now(); let rm={}; try{ rm=JSON.parse(localStorage.getItem(PFX+'learnedRm')||'{}')||{}; }catch(e){} let rc=false;
+      const tn=(k,t)=>Math.max(now,(t||0)+1,(rm[k]||0)+1); // 消した印より新しくする（覚え直した名前がまた消えないように）
       for (const k in m){ const a=o[k], b=m[k], ta=a&&typeof a==='object'?a.t||0:0;
         const same=JSON.stringify(a?.to??a)===JSON.stringify(b?.to??b) && JSON.stringify(a?.from??k)===JSON.stringify(b?.from??k);
         if (same){ if (ta && b && typeof b==='object') b.t=ta; } // 変わっていなければ時刻もそのまま
-        else m[k]= b&&typeof b==='object' ? {...b, t:now} : {from:k, to:b, t:now}; }
-      for (const k in o) if (!(k in m)){ rm[k]=now; rc=true; }
+        else m[k]= b&&typeof b==='object' ? {...b, t:tn(k,ta)} : {from:k, to:b, t:tn(k,ta)}; }
+      for (const k in o) if (!(k in m)){ rm[k]=tn(k,o[k]&&typeof o[k]==='object'?o[k].t:0); rc=true; }
       if (rc) localStorage.setItem(PFX+'learnedRm',JSON.stringify(Object.fromEntries(Object.entries(rm).sort((x,y)=>y[1]-x[1]).slice(0,500)))); }
     localStorage.setItem(PFX+'learned',JSON.stringify(m)); if (!keep) try{ queueSync(); }catch(e){} return true; }catch(e){ return false; } },
   get(){ const m=this.all(), r={}; for (const k in m) r[k]=m[k]?.to ?? m[k]; return r; },
@@ -1254,16 +1256,26 @@ window.addEventListener('hashchange',takeHashText); takeHashText(); recoverRaw()
 window.addEventListener('pageshow',()=>{ takeHashText(); renderPendNote(); });
 document.addEventListener('visibilitychange',()=>{ if (!document.hidden){ takeHashText(); renderPendNote(); } });
 window.addEventListener('storage',e=>{ if (e.key===PENDING_KEY) renderPendNote(); });
-// ---- 新しい版の確認：開いたときに新しい版があれば読み直す（古いページのままだと、直した読み取りや機能が使えないため） ----
-(async()=>{ try{
+// ---- 新しい版の確認：開いたとき・画面に戻ったとき（10分おき）に新しい版があれば読み直す（古いページのままだと、直した読み取りや機能が使えないため） ----
+// Safari はタブを開いたままだと、戻っても読み込み直さないので、読み込み時の1回だけでは古い版のまま使い続けてしまう
+let verAt=0, verHid=null; // verHid：「あとで」で閉じた版（開いている間は出さない）
+async function checkVer(){ verAt=Date.now(); try{
   const r=await fetch(location.pathname+'?vc='+Date.now(),{cache:'no-store'}); if(!r.ok) return;
   const v=((await r.text()).match(/const APP_VER='([^']+)'/)||[])[1]; if(!v || !(+v > +APP_VER)) return; // 新しい版のときだけ
   let tried=null; try{ tried=sessionStorage.getItem('pigpa_reloadFor'); }catch(e){}
-  if (tried===v) return; // 同じ版のために何度も読み直さない
-  try{ sessionStorage.setItem('pigpa_reloadFor',v); }catch(e){}
-  if (!picking && !shotImg && items.length===0){ location.replace(location.pathname+'?v='+v); } // まだ画像を選んでいなければ自動で読み直す（受け取った名前は端末に保存済み）
-  else toast('新しい版があります。画面を下に引っぱって読み直してください');
-}catch(e){} })();
+  const go=()=>location.replace(location.pathname+'?v='+v);
+  if (tried===v || verHid===v) return; // 同じ版のために自動で読み直したのに古い内容が返った／「あとで」を押した版は、もう出さない
+  if (!picking && !shotImg && items.length===0){ try{ sessionStorage.setItem('pigpa_reloadFor',v); }catch(e){} go(); return; } // まだ画像を選んでいなければ自動で読み直す（受け取った名前は端末に保存済み）
+  // それ以外は案内に「読み直す」と「✕（あとで）」（画像を選んでいる途中で勝手に読み直さない。✕で閉じればシートのじゃまをしない）
+  let d=$('newVer'); if (!d){ d=document.createElement('div'); d.id='newVer';
+    d.style.cssText='position:fixed;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(8px + env(safe-area-inset-top,0px));z-index:9999;background:#333;color:#fff;border-radius:14px;padding:10px 12px;display:flex;gap:10px;align-items:center;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.3)';
+    d.innerHTML='<span style="flex:1"></span><button type="button" style="font:inherit;font-weight:900;border:0;border-radius:999px;padding:6px 12px;background:#ff8fb1;color:#333">読み直す</button><button type="button" aria-label="あとで" style="font:inherit;font-weight:900;border:0;background:none;color:#fff;padding:6px 8px">✕</button>';
+    document.body.appendChild(d); }
+  d.querySelector('span').textContent='新しい版（v'+v+'）があります。読み直すと選んだ画像は消えます（受け取った名前は残ります）'; const bs=d.querySelectorAll('button'); bs[0].onclick=go; bs[1].onclick=()=>{ verHid=v; d.remove(); };
+}catch(e){} }
+checkVer();
+document.addEventListener('visibilitychange',()=>{ if (!document.hidden && Date.now()-verAt>10*60e3) checkVer(); });
+window.addEventListener('pageshow',e=>{ if (e.persisted && Date.now()-verAt>10*60e3) checkVer(); });
 // ---- 読み取った名前の確認（一覧・決めた名前と一致＝緑、iPhoneで読んだ＝黄、どちらでもない＝赤。赤はコピーの前に一度確かめてもらう） ----
 const nameOk=n=>!!n && (dictExact.has(n) || okNames.has(n) || learnedNames().has(n));
 // 'ok'＝一覧・覚えた名前と一致（緑）、'iph'＝一覧にないがiPhoneで読んだ名前（黄・コピーできる）、'ng'＝赤
@@ -1964,6 +1976,9 @@ $('outClose').onclick=()=>{ $('out').hidden=true; };
 // そろえる設定（PFX のあとの名前）。そろえないもの：読み取りの途中・ショートカットの受け取り・前の記録・背景（いまの仕組みのまま）・鍵・一度だけの印
 const SYNC_API='https://api.github.com', SYNC_FILE='piggparty/data.json';
 const SYNC_KEYS=['font','jfont','ct','cs','hideOwned','ownedSticker','numColor','totalColor','showOwned','txtStyle','titleForm','titleOne','titleSep','titleTotal','txtHead','txtTotal','txtFoot','autoCopy'];
+// 起動時に自動で書く初期値（fontDefault の書体10番・autoCopyOff1 の自動コピーなし）。時刻0のままこの値なら、自分で決めていない値として送らない・受け取らない
+// （先にそろえた新しい端末の初期値が、使い込んだ端末の書体などを上書きしないように）
+const SYNC_AUTO={font:'10', autoCopy:'0'}, syncAuto=(k,r)=>!(r.t||0) && r.v!=null && SYNC_AUTO[k]===String(r.v);
 function pocoSync(){ try{ const j=JSON.parse(localStorage.getItem('poco_sync')||'null'); return j&&typeof j==='object' ? j : {}; }catch(e){ return {}; } }
 function syncOn(){ const s=pocoSync(); let off=null; try{ off=localStorage.getItem(PFX+'syncOff'); }catch(e){} return !!(s.token && s.repo) && off!=='1'; }
 const jget=(k,d)=>{ try{ const v=localStorage.getItem(PFX+k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } };
@@ -1971,17 +1986,21 @@ const jset=(k,v)=>{ try{ localStorage.setItem(PFX+k,JSON.stringify(v)); }catch(e
 let SINFO=jget('syncInfo',{last:'',err:''}); // この端末のそろえの様子（ポコダンの last・err は使わない）
 // 文字にするのはかたまりごと（iPhone の Safari は引数が多すぎると止まる）
 const sb64e=t=>{ const b=new TextEncoder().encode(t); let s=''; for (let i=0;i<b.length;i+=8192) s+=String.fromCharCode.apply(null,b.subarray(i,i+8192)); return btoa(s); }, sb64d=b=>new TextDecoder().decode(Uint8Array.from(atob(b.replace(/\s/g,'')),c=>c.charCodeAt(0)));
+let syncTokUse=''; // 'poco_sync' の鍵が使えないとき、この端末で前に入れた鍵（控え：syncTok）で試す
+const tokGet=()=>{ try{ return localStorage.getItem(PFX+'syncTok')||''; }catch(e){ return ''; } }, tokSet=t=>{ try{ localStorage.setItem(PFX+'syncTok',t); }catch(e){} };
 async function syncGh(path,opt={}){ const s=pocoSync(); let r;
-  try{ r=await fetch(`${SYNC_API}/repos/${s.repo}/contents/${path}`,{...opt, headers:{Authorization:'Bearer '+s.token, Accept:'application/vnd.github+json', ...(opt.body?{'Content-Type':'application/json'}:{})}, cache:'no-store'}); }
+  try{ r=await fetch(`${SYNC_API}/repos/${s.repo}/contents/${path}`,{...opt, headers:{Authorization:'Bearer '+(syncTokUse||s.token), Accept:'application/vnd.github+json', ...(opt.body?{'Content-Type':'application/json'}:{})}, cache:'no-store'}); }
   catch(e){ throw new Error('通信できません'); }
   if (r.status===404 && !opt.method) return null; // まだファイルが無い（読むときだけ。書くときの 404 は鍵がこのリポジトリを見られない）
   if (r.status===404) throw new Error('鍵（トークン）が使えません（このリポジトリを見られません）'); if (!r.ok) throw new Error(r.status===401||r.status===403 ? '鍵（トークン）が使えません' : 'GitHub '+r.status); return r.json(); }
 // 設定ごとに変えた時刻を持つ（{名前:{v:値, t:時刻}}）。はじめて見た値は時刻0。ch：変えたものがあった
+// 変えた時刻は「今」と「前の時刻+1」の大きいほう（時計が進んだ端末が付けた先の時刻を受け取っていても、あとから変えたほうが勝つように）
 function setStamp(){ const M=jget('syncSetT',{}); let ch=false, nw=false;
   for (const k of SYNC_KEYS){ let v=null; try{ v=localStorage.getItem(PFX+k); }catch(e){}
-    if (!M[k] || typeof M[k]!=='object'){ M[k]={v,t:0}; nw=true; } else if (M[k].v!==v){ M[k]={v,t:Date.now()}; ch=true; } }
+    if (!M[k] || typeof M[k]!=='object'){ M[k]={v,t:0}; nw=true; } else if (M[k].v!==v){ M[k]={v,t:Math.max(Date.now(),(M[k].t||0)+1)}; ch=true; } }
   if (ch || nw) jset('syncSetT',M); return [M,ch]; }
 // 2台の内容を合わせる：名前・設定ごとに新しいほう（同じ時刻ならリポジトリのほう）。消した印のほうが新しい名前は消したまま。変わったら true
+// 受け取った時刻は切り下げない（先の時刻のまま持っておけば、次に変えたとき「前の時刻+1」で必ず勝てる）
 function mergeIn(j){ let ch=false; const tt=e=>(e&&typeof e==='object'&&e.t)||0;
   const L=learned.all(), R=j.learned&&typeof j.learned==='object' ? j.learned : {}, rm=jget('learnedRm',{}), rr=j.learnedRm&&typeof j.learnedRm==='object' ? j.learnedRm : {};
   for (const k in rr) if ((rr[k]||0)>(rm[k]||0)) rm[k]=rr[k];
@@ -1989,18 +2008,23 @@ function mergeIn(j){ let ch=false; const tt=e=>(e&&typeof e==='object'&&e.t)||0;
   for (const k in L) if (k in rm && rm[k]>=tt(L[k])){ delete L[k]; ch=true; }
   if (ch) learned.save(L,true); jset('learnedRm',Object.fromEntries(Object.entries(rm).sort((x,y)=>y[1]-x[1]).slice(0,500)));
   const [M]=setStamp(), RS=j.set&&typeof j.set==='object' ? j.set : {};
-  for (const k of SYNC_KEYS){ const r=RS[k], m=M[k]; if (!r || typeof r!=='object' || (r.v==null && !r.t) || (r.t||0)<(m.t||0)) continue;
+  for (const k of SYNC_KEYS){ const r=RS[k], m=M[k]; if (!r || typeof r!=='object' || (r.v==null && !r.t) || syncAuto(k,r) || (r.t||0)<(m.t||0)) continue;
     const v=r.v==null ? null : String(r.v); if (v!==m.v){ try{ v==null ? localStorage.removeItem(PFX+k) : localStorage.setItem(PFX+k,v); }catch(e){} ch=true; } M[k]={v,t:r.t||0}; }
   jset('syncSetT',M); return ch; }
 const srt=o=>Object.fromEntries(Object.keys(o).sort().map(k=>[k,o[k]])); // 並びをそろえる（同じ中身なら同じ文字にして、むだに書かない）
-// 一度も決めていない設定は送らない（ほかの端末の設定を消さない）
-const mine=()=>{ const [M]=setStamp(), set={}; for (const k of SYNC_KEYS) if (M[k].v!=null || M[k].t) set[k]=M[k]; return {v:1, learned:srt(learned.all()), learnedRm:srt(jget('learnedRm',{})), set}; };
+// 一度も決めていない設定・自動で書いた初期値は送らない（ほかの端末の設定を消さない）
+const mine=()=>{ const [M]=setStamp(), set={}; for (const k of SYNC_KEYS) if ((M[k].v!=null || M[k].t) && !syncAuto(k,M[k])) set[k]=M[k]; return {v:1, learned:srt(learned.all()), learnedRm:srt(jget('learnedRm',{})), set}; };
 let syncT=0, syncing=false, syncAgain=false;
 function queueSync(){ if (!syncOn()) return; clearTimeout(syncT); syncT=setTimeout(()=>syncNow(),3000); }
 async function syncNow(){ if (!syncOn()) return false; if (syncing){ syncAgain=true; return false; } syncing=true; renderSync('そろえています…'); let ch=false;
-  try{ for (let tries=0; tries<3; tries++){ const f=await syncGh(SYNC_FILE); if (f && mergeIn(JSON.parse(sb64d(f.content)))) ch=true;
+  const run=async()=>{ for (let tries=0; tries<3; tries++){ const f=await syncGh(SYNC_FILE); if (f && mergeIn(JSON.parse(sb64d(f.content)))) ch=true;
       const body=JSON.stringify(mine()); if (f && sb64d(f.content)===body) break;
-      try{ if (!await syncGh(SYNC_FILE,{method:'PUT', body:JSON.stringify({message:'ピグパの覚えた名前・設定を更新', content:sb64e(body), ...(f?{sha:f.sha}:{})})})) throw new Error('送れませんでした'); break; }catch(e){ if (!/409|422/.test(e.message) || tries===2) throw e; } } // 同時に書いたらやり直す
+      try{ if (!await syncGh(SYNC_FILE,{method:'PUT', body:JSON.stringify({message:'ピグパの覚えた名前・設定を更新', content:sb64e(body), ...(f?{sha:f.sha}:{})})})) throw new Error('送れませんでした'); break; }catch(e){ if (!/409|422/.test(e.message) || tries===2) throw e; } } }; // 同時に書いたらやり直す
+  try{ try{ await run(); if (pocoSync().token!==tokGet()) tokSet(pocoSync().token||''); }
+    catch(e){ // 開いたままのポコダンが古い鍵に戻したときは、この端末で入れた鍵で試して、使えたら 'poco_sync' に戻す
+      const my=tokGet(); if (!/鍵/.test(e.message) || !my || my===pocoSync().token) throw e;
+      syncTokUse=my; try{ await run(); } finally{ syncTokUse=''; }
+      const s=pocoSync(); s.token=my; try{ localStorage.setItem('poco_sync',JSON.stringify(s)); }catch(e2){} }
     SINFO={last:new Date().toLocaleString('ja-JP'), err:''}; jset('syncInfo',SINFO); return true;
   }catch(e){ SINFO.err=e.message; jset('syncInfo',SINFO); return false; }
   finally{ syncing=false; renderSync(); if (ch) redrawAfterSync(); if (syncAgain){ syncAgain=false; queueSync(); } } }
@@ -2030,7 +2054,7 @@ function pocoBgMark(){ return new Promise(res=>{ let r; try{ r=indexedDB.open('p
     q.onerror=()=>{ db.close(); res(); }; }; }); }
 $('syncSave').onclick=async()=>{ const v=$('syncToken').value.trim();
   if (v && !v.startsWith('••')){ if (!pocoSync().token) await pocoBgMark(); const s={repo:'ahonokiki/pocodun-sync', token:'', last:'', bg:{}, ...pocoSync()}; s.token=v; if (!s.repo) s.repo='ahonokiki/pocodun-sync';
-    try{ localStorage.setItem('poco_sync',JSON.stringify(s)); }catch(e){ toast('保存できませんでした'); return; } }
+    try{ localStorage.setItem('poco_sync',JSON.stringify(s)); }catch(e){ toast('保存できませんでした'); return; } tokSet(v); }
   else if (!pocoSync().token){ toast('鍵（トークン）を貼り付けてください'); return; }
   try{ localStorage.removeItem(PFX+'syncOff'); }catch(e){} SINFO.err=''; jset('syncInfo',SINFO); $('syncToken').blur();
   toast((await syncNow()) ? 'つなぎました。ほかの端末とそろえました' : 'つなげませんでした。鍵を確かめてください'); };
